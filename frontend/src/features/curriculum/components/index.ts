@@ -1,0 +1,1 @@
+export { CurriculumGrid } from './CurriculumGrid';
