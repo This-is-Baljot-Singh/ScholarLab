@@ -71,13 +71,16 @@ async def get_analytics_overview(current_user: dict = Depends(require_role([Role
         }
         
         # 2. Generate live inference demo (sample student prediction)
+        # Features must match what the XGBoost model was trained on
+        sample_features = pd.DataFrame([{
+            "attendance_rate": 0.78,
+            "avg_arrival_delay_mins": 2.5,
+            "curriculum_engagement_score": 7.8,
+            "spatial_anomalies": 0,
+            "biometric_failures": 1
+        }])
+        
         if model and explainer:
-            sample_features = pd.DataFrame([{
-                "attendance_rate": 0.78,
-                "late_submissions": 2,
-                "avg_score": 72.5,
-                "active_ws_sessions": 8
-            }])
             demo_prediction = model.predict(sample_features)[0]
             demo_probability = model.predict_proba(sample_features)[0][1]
             demo_classification = "Safe" if demo_probability < 0.5 else "At Risk"
@@ -86,19 +89,13 @@ async def get_analytics_overview(current_user: dict = Depends(require_role([Role
             # Fallback if model not loaded
             demo_classification = "Safe"
             demo_risk_percentage = 35
-            sample_features = pd.DataFrame([{
-                "attendance_rate": 0.78,
-                "late_submissions": 2,
-                "avg_score": 72.5,
-                "active_ws_sessions": 8
-            }])
         
         live_inference_demo = {
             "classification": demo_classification,
             "risk_score_percentage": demo_risk_percentage,
             "telemetry_used": {
                 "attendance_rate": float(sample_features.iloc[0]["attendance_rate"]),
-                "curriculum_engagement_score": float(sample_features.iloc[0]["avg_score"]),
+                "curriculum_engagement_score": float(sample_features.iloc[0]["curriculum_engagement_score"]),
             }
         }
         
@@ -121,11 +118,13 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
 
     # In production, dynamically query MongoDB to build this feature vector.
     # We are simulating the extracted features for this specific user.
+    # Features must match what the XGBoost model was trained on
     features = pd.DataFrame([{
         "attendance_rate": 0.65,
-        "late_submissions": 4,
-        "avg_score": 58.5,
-        "active_ws_sessions": 12
+        "avg_arrival_delay_mins": 8.5,
+        "curriculum_engagement_score": 5.8,
+        "spatial_anomalies": 1,
+        "biometric_failures": 3
     }])
 
     # 1. Generate Prediction
