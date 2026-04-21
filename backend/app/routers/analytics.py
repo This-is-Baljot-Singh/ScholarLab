@@ -142,7 +142,7 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
             impact = float(shap_values[0][i]) 
             feature_impact.append({
                 "feature": col,
-                "value": float(features.iloc[0][i]),
+                "value": float(features.iloc[0, i]),
                 "shap_impact": impact,
                 "human_readable": f"The '{col}' variable {'increased' if impact > 0 else 'decreased'} the risk score by {abs(impact):.3f} points."
             })
