@@ -113,42 +113,46 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
     """
     Returns XGBoost risk prediction alongside SHAP human-readable explanations.
     """
-    if not model or not explainer:
-        raise HTTPException(status_code=503, detail="Prediction engine unavailable. Please train the model first.")
+    try:
+        if not model or not explainer:
+            raise HTTPException(status_code=503, detail="Prediction engine unavailable. Please train the model first.")
 
-    # In production, dynamically query MongoDB to build this feature vector.
-    # We are simulating the extracted features for this specific user.
-    # Features must match what the XGBoost model was trained on
-    features = pd.DataFrame([{
-        "attendance_rate": 0.65,
-        "avg_arrival_delay_mins": 8.5,
-        "curriculum_engagement_score": 5.8,
-        "spatial_anomalies": 1,
-        "biometric_failures": 3
-    }])
+        # In production, dynamically query MongoDB to build this feature vector.
+        # We are simulating the extracted features for this specific user.
+        # Features must match what the XGBoost model was trained on
+        features = pd.DataFrame([{
+            "attendance_rate": 0.65,
+            "avg_arrival_delay_mins": 8.5,
+            "curriculum_engagement_score": 5.8,
+            "spatial_anomalies": 1,
+            "biometric_failures": 3
+        }])
 
-    # 1. Generate Prediction
-    prediction = model.predict(features)[0]
-    probability = model.predict_proba(features)[0][1]
+        # 1. Generate Prediction
+        prediction = model.predict(features)[0]
+        probability = model.predict_proba(features)[0][1]
 
-    # 2. Extract SHAP values
-    shap_values = explainer.shap_values(features)
+        # 2. Extract SHAP values
+        shap_values = explainer.shap_values(features)
 
-    # 3. Format the explainer payload for the UI
-    feature_impact = []
-    for i, col in enumerate(features.columns):
-        # shap_values[0] accesses the target class impacts
-        impact = float(shap_values[0][i]) 
-        feature_impact.append({
-            "feature": col,
-            "value": float(features.iloc[0][i]),
-            "shap_impact": impact,
-            "human_readable": f"The '{col}' variable {'increased' if impact > 0 else 'decreased'} the risk score by {abs(impact):.3f} points."
-        })
+        # 3. Format the explainer payload for the UI
+        feature_impact = []
+        for i, col in enumerate(features.columns):
+            # shap_values[0] accesses the target class impacts
+            impact = float(shap_values[0][i]) 
+            feature_impact.append({
+                "feature": col,
+                "value": float(features.iloc[0][i]),
+                "shap_impact": impact,
+                "human_readable": f"The '{col}' variable {'increased' if impact > 0 else 'decreased'} the risk score by {abs(impact):.3f} points."
+            })
 
-    return {
-        "user_id": user_id,
-        "risk_label": int(prediction),
-        "risk_probability": float(probability),
-        "shap_explanations": feature_impact
-    }
+        return {
+            "user_id": user_id,
+            "risk_label": int(prediction),
+            "risk_probability": float(probability),
+            "shap_explanations": feature_impact
+        }
+    except Exception as e:
+        logger.error(f"Error in predict_student_risk: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating prediction: {str(e)}")
