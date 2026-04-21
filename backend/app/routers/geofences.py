@@ -6,7 +6,7 @@ from app.database import geofences_collection
 from app.security import get_current_user, require_role
 from app.schemas import RoleEnum
 
-router = APIRouter(prefix="/api/geofences", tags=["Geofences"])
+router = APIRouter(tags=["Geofences"])
 
 class GeofenceCreate(BaseModel):
     name: str

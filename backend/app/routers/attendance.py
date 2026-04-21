@@ -17,7 +17,7 @@ from app.routers.websockets import manager
 from webauthn import verify_authentication_response
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/attendance", tags=["Attendance Verification Pipeline"])
+router = APIRouter(tags=["Attendance Verification Pipeline"])
 
 # --- WebAuthn Environment (Ensure these match your frontend deployment) ---
 RP_ID = "localhost" 
