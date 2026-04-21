@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 import { Users, AlertTriangle, ShieldAlert, TrendingUp, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
+import { AttendanceTrendsChart } from './AttendanceTrendsChart';
+import { AtRiskStudentsList } from './AtRiskStudentsList';
 
 export const PredictiveAnalyticsDashboard: React.FC = () => {
   // 1. Fetch ML Analytics Data
@@ -39,18 +38,13 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
 
   const { campus_aggregate, live_inference_demo } = analytics;
 
-  // Mock data for charts based on campus aggregates
-  const attendanceTrends = [
-    { date: 'Mon', rate: 92 }, { date: 'Tue', rate: 89 },
-    { date: 'Wed', rate: 85 }, { date: 'Thu', rate: campus_aggregate.current_attendance_rate },
-  ];
-
+  // Format risk distribution data for pie chart
   const riskDistribution = [
     { name: 'Safe', value: campus_aggregate.total_students_tracked - campus_aggregate.students_at_risk },
     { name: 'At Risk', value: campus_aggregate.students_at_risk },
   ];
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-6 py-6">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-900">Predictive Analytics Engine</h2>
         <p className="text-sm text-slate-500">Powered by XGBoost & Spatial Telemetry</p>
@@ -90,6 +84,9 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
 
       {/* Middle Row: Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Attendance Trends Line Chart */}
+        <AttendanceTrendsChart />
+
         {/* Risk Distribution Chart */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold text-slate-800">Campus Risk Distribution</h3>
@@ -105,7 +102,7 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {riskDistribution.map((entry, index) => (
+                  {riskDistribution.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
                   ))}
                 </Pie>
@@ -114,7 +111,10 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
+      {/* Live Inference & At-Risk Students */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Live Inference Feed */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
            <h3 className="mb-4 text-lg font-semibold text-slate-800">Live Inference Demo</h3>
@@ -155,6 +155,9 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
              </div>
            </div>
         </div>
+
+        {/* At-Risk Students List */}
+        <AtRiskStudentsList />
       </div>
     </div>
   );

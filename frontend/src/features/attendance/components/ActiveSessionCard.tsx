@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, MapPin, Users } from 'lucide-react';
 import type { ActiveSession } from '@/types/student';
+import { useAuthUser } from '@/features/auth/hooks';
 import { MarkAttendanceFlow } from './MarkAttendanceFlow';
 
 interface ActiveSessionProps {
@@ -13,6 +14,7 @@ export const ActiveSessionCard: React.FC<ActiveSessionProps> = ({
   onAttendanceMarked,
 }) => {
   const [showAttendanceFlow, setShowAttendanceFlow] = useState(false);
+  const user = useAuthUser();
 
   return (
     <>
@@ -75,15 +77,19 @@ export const ActiveSessionCard: React.FC<ActiveSessionProps> = ({
       </div>
 
       {/* Attendance Flow Modal */}
-      <MarkAttendanceFlow
-        isOpen={showAttendanceFlow}
-        lectureId={session.lecture.id}
-        onClose={() => setShowAttendanceFlow(false)}
-        onSuccess={(data) => {
-          onAttendanceMarked(data);
-          setShowAttendanceFlow(false);
-        }}
-      />
+      {user && (
+        <MarkAttendanceFlow
+          isOpen={showAttendanceFlow}
+          sessionId={session.lecture.id}
+          geofenceId={`geo_${session.lecture.classCode}`}
+          userEmail={user.email}
+          onClose={() => setShowAttendanceFlow(false)}
+          onSuccess={(data) => {
+            onAttendanceMarked(data);
+            setShowAttendanceFlow(false);
+          }}
+        />
+      )}
     </>
   );
 };

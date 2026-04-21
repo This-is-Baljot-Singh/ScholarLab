@@ -15,7 +15,8 @@ export const useStudentWebSocket = (enabled: boolean = true) => {
   const [unlockedItems, setUnlockedItems] = useState<CurriculumItem[]>([]);
   
   // Grab the token to authenticate the WS connection
-  const token = useAuthStore((state) => state.accessToken);
+  const tokens = useAuthStore((state) => state.tokens);
+  const token = tokens?.accessToken;
 
   useEffect(() => {
     if (!enabled || !token) return;

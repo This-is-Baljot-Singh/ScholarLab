@@ -8,6 +8,13 @@ import type {
 } from '@simplewebauthn/browser'; // Brings in strict typing for the cryptograms
 import { apiClient } from '@/lib/api';
 
+export interface WebAuthnCredential {
+  id: string;
+  type: string;
+  transports?: string[];
+  name?: string;
+}
+
 export const useWebAuthn = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

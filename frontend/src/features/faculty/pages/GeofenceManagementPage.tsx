@@ -80,7 +80,7 @@ export const GeofenceManagementPage: React.FC<GeofenceManagementPageProps> = ({ 
     }
   };
 
-  const handleDeleteGeofence = async (geofenceId: string) => {
+  const handleDeleteGeofence = async () => {
     // Implement delete logic when router is ready
     toast.info('Deactivation pipeline not yet active');
   };

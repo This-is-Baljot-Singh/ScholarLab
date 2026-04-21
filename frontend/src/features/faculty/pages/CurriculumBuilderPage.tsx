@@ -3,7 +3,6 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { CurriculumGraphBuilder } from '../components';
 import { toast } from 'sonner';
-import { apiClient } from '@/api/client';
 import type { CurriculumGraph } from '@/types/faculty';
 
 export const CurriculumBuilderPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {

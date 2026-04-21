@@ -45,12 +45,9 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(geofences.router, prefix="/api/geofences")
 app.include_router(attendance.router, prefix="/api/attendance")
 app.include_router(student.router, prefix="/api/student")
-app.include_router(analytics.router, prefix="/api/analytics") # <-- Mount the ML router
-
-# Include WebSocket router
+app.include_router(analytics.router, prefix="/api/analytics")
 app.include_router(websockets.router, prefix="/api/ws")
 
-# --- FIX: ADDED /api PREFIX SO THE FRONTEND AXIOS CLIENT CAN HIT IT ---
 @app.get("/api/faculty/dashboard")
 async def faculty_only_route(current_user: dict = Depends(require_role([RoleEnum.faculty, RoleEnum.admin]))):
     return {"message": f"Welcome Faculty {current_user['full_name']}"}
