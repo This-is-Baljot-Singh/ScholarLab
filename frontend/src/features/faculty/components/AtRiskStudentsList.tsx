@@ -1,51 +1,36 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api';
 import { StudentRiskModal } from './StudentRiskModal';
 
 interface AtRiskStudent {
   id: string;
   name: string;
+  email: string;
   riskScore: number;
   riskLabel: 'Safe' | 'At Risk' | 'Critical';
   lastSeen?: string;
 }
 
-interface AtRiskStudentsListProps {
-  students?: AtRiskStudent[];
-  isLoading?: boolean;
-}
-
-export const AtRiskStudentsList: React.FC<AtRiskStudentsListProps> = ({
-  students = [
-    {
-      id: 'student_001',
-      name: 'Rajesh Kumar',
-      riskScore: 0.78,
-      riskLabel: 'Critical',
-      lastSeen: '2 hours ago',
-    },
-    {
-      id: 'student_002',
-      name: 'Priya Singh',
-      riskScore: 0.62,
-      riskLabel: 'At Risk',
-      lastSeen: '5 minutes ago',
-    },
-    {
-      id: 'student_003',
-      name: 'Amit Patel',
-      riskScore: 0.55,
-      riskLabel: 'At Risk',
-      lastSeen: '1 hour ago',
-    },
-  ],
-  isLoading = false,
-}) => {
+export const AtRiskStudentsList: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleStudentClick = (studentId: string) => {
+  // Fetch at-risk students from backend
+  const { data: students = [], isLoading, isError } = useQuery({
+    queryKey: ['at-risk-students'],
+    queryFn: async () => {
+      const response = await apiClient.get<AtRiskStudent[]>('/analytics/at-risk-students');
+      return response.data;
+    },
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  const handleStudentClick = (studentId: string, studentName: string) => {
     setSelectedStudent(studentId);
+    setSelectedStudentName(studentName);
     setIsModalOpen(true);
   };
 
@@ -66,8 +51,6 @@ export const AtRiskStudentsList: React.FC<AtRiskStudentsListProps> = ({
     return 'text-emerald-600';
   };
 
-  const selectedStudentName = students.find(s => s.id === selectedStudent)?.name;
-
   return (
     <>
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -80,7 +63,12 @@ export const AtRiskStudentsList: React.FC<AtRiskStudentsListProps> = ({
 
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <div className="text-slate-500">Loading...</div>
+            <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center py-8 gap-2 text-red-600">
+            <AlertCircle className="h-5 w-5" />
+            <p className="text-sm">Failed to load at-risk students</p>
           </div>
         ) : students.length === 0 ? (
           <div className="flex items-center justify-center py-8">
@@ -93,8 +81,8 @@ export const AtRiskStudentsList: React.FC<AtRiskStudentsListProps> = ({
               return (
                 <button
                   key={student.id}
-                  onClick={() => handleStudentClick(student.id)}
-                  className={`w-full flex items-center justify-between rounded-lg p-4 border transition-all hover:shadow-md active:scale-95 ${colors.bg} ${colors.border} border`}
+                  onClick={() => handleStudentClick(student.email, student.name)}
+                  className={`w-full flex items-center justify-between rounded-lg p-4 border transition-all hover:shadow-md active:scale-95 ${colors.bg} ${colors.border}`}
                 >
                   <div className="flex items-center gap-4 flex-1 text-left">
                     <div className="flex-shrink-0">
@@ -113,7 +101,7 @@ export const AtRiskStudentsList: React.FC<AtRiskStudentsListProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end">
                       <span className={`font-bold ${getRiskScoreColor(student.riskScore)}`}>
-                        {(student.riskScore * 100).toFixed(0)}%
+                        {Math.round(student.riskScore * 100)}%
                       </span>
                       <span className={`text-xs font-medium ${colors.text}`}>
                         {student.riskLabel}
