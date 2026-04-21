@@ -44,7 +44,7 @@ export const AttendanceTrendsChart: React.FC = () => {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h3 className="mb-4 text-lg font-semibold text-slate-800">Attendance Trends (30 Days)</h3>
-      <div style={{ width: '100%', height: '300px' }}>
+      <div style={{ display: 'block', width: '100%', height: '300px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={trends}

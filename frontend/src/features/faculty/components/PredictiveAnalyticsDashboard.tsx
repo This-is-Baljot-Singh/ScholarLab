@@ -90,7 +90,7 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
         {/* Risk Distribution Chart */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold text-slate-800">Campus Risk Distribution</h3>
-          <div style={{ width: '100%', height: '300px' }}>
+          <div style={{ display: 'block', width: '100%', height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
