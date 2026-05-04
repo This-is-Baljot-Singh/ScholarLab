@@ -14,18 +14,24 @@ interface AtRiskStudent {
 }
 
 export const AtRiskStudentsList: React.FC = () => {
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<string | undefined>(undefined);
+  const [selectedStudentName, setSelectedStudentName] = useState<string | undefined>(undefined);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch at-risk students from backend
+  // Fetch at-risk students from backend.
+  // Polling removed — the React Query cache is updated surgically by
+  // useFacultyWebSocket when a `risk_score_updated` event is received
+  // (via queryClient.setQueryData), and the query key is invalidated on
+  // `attendance_verified` events.
+  // A 5-minute background refresh is kept as a safety-net fallback.
   const { data: students = [], isLoading, isError } = useQuery({
     queryKey: ['at-risk-students'],
     queryFn: async () => {
       const response = await apiClient.get<AtRiskStudent[]>('/analytics/at-risk-students');
       return response.data;
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 300_000,
+    staleTime: 60_000,
   });
 
   const handleStudentClick = (studentId: string, studentName: string) => {
@@ -100,8 +106,9 @@ export const AtRiskStudentsList: React.FC = () => {
 
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end">
-                      <span className={`font-bold ${getRiskScoreColor(student.riskScore)}`}>
-                        {Math.round(student.riskScore * 100)}%
+                      {/* Exact percentage — no rounding beyond 1 decimal place */}
+                      <span className={`font-bold tabular-nums ${getRiskScoreColor(student.riskScore)}`}>
+                        {(student.riskScore * 100).toFixed(1)}%
                       </span>
                       <span className={`text-xs font-medium ${colors.text}`}>
                         {student.riskLabel}

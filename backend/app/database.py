@@ -2,26 +2,44 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic_settings import BaseSettings
 import pymongo
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
-    MONGODB_URL: str = "mongodb://localhost:27017"
-    DATABASE_NAME: str = "scholarlab"
+    # MongoDB URL - supports both Docker and local connections
+    MONGODB_URL: str = os.getenv(
+        "MONGODB_URL",
+        "mongodb://localhost:27017"  # Local default
+    )
+    DATABASE_NAME: str = os.getenv("DATABASE_NAME", "scholarlab")
     SECRET_KEY: str = "your-super-secret-jwt-key" # Rotate in production!
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 settings = Settings()
 
-client = AsyncIOMotorClient(settings.MONGODB_URL)
+# Log MongoDB connection info (mask password)
+_masked_url = settings.MONGODB_URL.replace(settings.MONGODB_URL.split("@")[0].split("://")[1] if "@" in settings.MONGODB_URL else "", "***") if "@" in settings.MONGODB_URL else settings.MONGODB_URL
+logger.info(f"MongoDB URL: {_masked_url}")
+
+client = AsyncIOMotorClient(settings.MONGODB_URL, tz_aware=True)
 db = client[settings.DATABASE_NAME]
 
 users_collection = db.get_collection("users")
 geofences_collection = db.get_collection("geofences")
 curriculum_collection = db.get_collection("curriculum")
 attendance_collection = db.get_collection("attendance")
+
+
+async def get_db():
+    """FastAPI dependency to get the database instance."""
+    return db
 
 async def init_db_indexes():
     """Establish required indexes for performance and spatial querying."""

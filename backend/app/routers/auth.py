@@ -15,7 +15,9 @@ from webauthn import (
     generate_authentication_options, verify_authentication_response,
     options_to_json, base64url_to_bytes
 )
-from webauthn.helpers.structs import RegistrationCredential, AuthenticationCredential
+from webauthn.helpers.structs import (
+    RegistrationCredential, AuthenticationCredential, PublicKeyCredentialDescriptor
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
@@ -208,7 +210,7 @@ async def verify_webauthn_registration(request: WebAuthnRegistrationVerify):
         logger.error(f"WebAuthn verification failed: {str(e)}")
         raise HTTPException(status_code=400, detail="Registration verification failed")
 
-@router.post("/webauthn/authenticate/options")
+@router.post("/webauthn/generate-authentication-options")
 async def generate_webauthn_auth_options(request: WebAuthnOptionsRequest):
     """Generate challenge for verifying presence during attendance."""
     user = await users_collection.find_one({"email": request.email})
@@ -217,7 +219,10 @@ async def generate_webauthn_auth_options(request: WebAuthnOptionsRequest):
 
     options = generate_authentication_options(
         rp_id=RP_ID,
-        allow_credentials=[cred["credential_id"] for cred in user.get("webauthn_credentials", [])]
+        allow_credentials=[
+            PublicKeyCredentialDescriptor(id=base64url_to_bytes(cred["credential_id"]))
+            for cred in user.get("webauthn_credentials", [])
+        ]
     )
     
     await users_collection.update_one(
@@ -226,3 +231,46 @@ async def generate_webauthn_auth_options(request: WebAuthnOptionsRequest):
     )
     
     return options_to_json(options)
+
+@router.post("/webauthn/verify-authentication")
+async def verify_webauthn_authentication(request: WebAuthnAuthVerify):
+    """Verify the authenticator's assertion response."""
+    user = await users_collection.find_one({"email": request.email})
+    if not user or "current_challenge" not in user:
+        raise HTTPException(status_code=400, detail="Challenge not found")
+
+    credential_id = request.credential.get("id")
+    stored_credential = next((c for c in user.get("webauthn_credentials", []) if c["credential_id"] == credential_id), None)
+
+    if not stored_credential:
+        raise HTTPException(status_code=403, detail="Unrecognized biometric device.")
+
+    try:
+        verification = verify_authentication_response(
+            credential=request.credential,
+            expected_challenge=user["current_challenge"],
+            expected_origin=ORIGIN,
+            expected_rp_id=RP_ID,
+            credential_public_key=stored_credential["public_key"],
+            credential_current_sign_count=stored_credential["sign_count"]
+        )
+        
+        # Update sign count and clear challenge
+        await users_collection.update_one(
+            {"_id": user["_id"], "webauthn_credentials.credential_id": credential_id},
+            {
+                "$set": {"webauthn_credentials.$.sign_count": verification.new_sign_count},
+                "$unset": {"current_challenge": ""}
+            }
+        )
+        
+        # Issue a temporary access token for generic login purposes (if needed)
+        access_token = create_access_token(
+            data={"sub": user["email"], "role": user["role"]},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        
+        return {"status": "success", "message": "Authentication verified", "access_token": access_token}
+    except Exception as e:
+        logger.error(f"WebAuthn verification failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Authentication verification failed")

@@ -5,6 +5,7 @@ from app.schemas import RoleEnum
 from app.database import attendance_collection, users_collection
 from bson import ObjectId
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 import joblib
 import shap
 import pandas as pd
@@ -18,13 +19,36 @@ MODEL_PATH = "app/ml/models/xgboost_risk_model.joblib"
 model = None
 explainer = None
 
-# Initialize ML model and SHAP explainer into memory on startup
+# Initialize ML model on startup (lazy load SHAP explainer when needed)
 if os.path.exists(MODEL_PATH):
-    model = joblib.load(MODEL_PATH)
-    # SHAP TreeExplainer is highly optimized for XGBoost/RandomForest ensembles
-    explainer = shap.TreeExplainer(model)
+    try:
+        model = joblib.load(MODEL_PATH)
+        logger.info("ML Model loaded successfully")
+    except Exception as e:
+        logger.error(f"Failed to load ML model: {e}")
 else:
     logger.warning("ML Model not found. Analytics endpoints will run in degraded mode.")
+
+
+def _get_explainer():
+    """Lazy load SHAP explainer (called only when needed by endpoints)"""
+    global explainer
+    if explainer is None and model is not None:
+        try:
+            explainer = shap.TreeExplainer(model)
+            logger.info("SHAP explainer initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize SHAP explainer: {e}")
+            logger.warning("SHAP explanations will not be available")
+    return explainer
+
+
+def _normalize_utc_datetime(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 async def extract_student_features(student_email: str) -> dict:
     """
@@ -47,7 +71,9 @@ async def extract_student_features(student_email: str) -> dict:
     # Calculate average arrival delay (simulated from timestamps)
     delays = []
     for record in attendance_records:
-        hour = record.get("timestamp", datetime.now()).hour
+        # Use timezone-aware datetime as default
+        record_time = _normalize_utc_datetime(record.get("timestamp"))
+        hour = record_time.hour
         # Assume classes start at 9 AM, so delay = hour - 9
         delay = max(hour - 9, 0)
         delays.append(delay)
@@ -98,6 +124,7 @@ async def get_at_risk_students(current_user: dict = Depends(require_role([RoleEn
     try:
         if not model:
             raise HTTPException(status_code=503, detail="Prediction engine unavailable")
+        assert model is not None
         
         # Get all students
         students = await users_collection.find({"role": "student"}).to_list(None)
@@ -130,7 +157,8 @@ async def get_at_risk_students(current_user: dict = Depends(require_role([RoleEn
                 
                 last_seen = "Never"
                 if last_attendance:
-                    time_ago = datetime.now(timezone.utc) - last_attendance["timestamp"]
+                    last_seen_time = _normalize_utc_datetime(last_attendance.get("timestamp"))
+                    time_ago = datetime.now(timezone.utc) - last_seen_time
                     if time_ago.total_seconds() < 3600:
                         last_seen = "Now"
                     elif time_ago.total_seconds() < 86400:
@@ -183,15 +211,16 @@ async def get_analytics_overview(current_user: dict = Depends(require_role([Role
         # Get at-risk students (> 50% probability)
         at_risk_count = 0
         students = await users_collection.find({"role": "student"}).to_list(None)
-        for student in students[:20]:  # Sample first 20 for performance
-            try:
-                features = await extract_student_features(student["email"])
-                features_df = pd.DataFrame([features])
-                probability = model.predict_proba(features_df)[0][1]
-                if probability > 0.5:
-                    at_risk_count += 1
-            except:
-                pass
+        if model is not None:
+            for student in students[:20]:  # Sample first 20 for performance
+                try:
+                    features = await extract_student_features(student["email"])
+                    features_df = pd.DataFrame([features])
+                    probability = model.predict_proba(features_df)[0][1]
+                    if probability > 0.5:
+                        at_risk_count += 1
+                except:
+                    pass
         
         students_at_risk = int(at_risk_count)
         
@@ -207,10 +236,9 @@ async def get_analytics_overview(current_user: dict = Depends(require_role([Role
         
         # 2. Generate live inference demo using real sample student
         sample_student = students[0] if students else None
-        if sample_student:
+        if sample_student and model is not None:
             demo_features = await extract_student_features(sample_student["email"])
             demo_df = pd.DataFrame([demo_features])
-            demo_prediction = model.predict(demo_df)[0]
             demo_probability = model.predict_proba(demo_df)[0][1]
         else:
             demo_df = pd.DataFrame([{
@@ -220,8 +248,7 @@ async def get_analytics_overview(current_user: dict = Depends(require_role([Role
                 "spatial_anomalies": 0,
                 "biometric_failures": 1
             }])
-            demo_prediction = model.predict(demo_df)[0] if model else 0
-            demo_probability = model.predict_proba(demo_df)[0][1] if model else 0.35
+            demo_probability = 0.35
         
         demo_classification = "Safe" if demo_probability < 0.5 else "At Risk"
         demo_risk_percentage = int(demo_probability * 100)
@@ -249,8 +276,12 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
     XGBoost risk prediction with SHAP explanations using real student data.
     """
     try:
-        if not model or not explainer:
+        if not model:
             raise HTTPException(status_code=503, detail="Prediction engine unavailable.")
+        assert model is not None
+        
+        # Lazy load explainer
+        current_explainer = _get_explainer()
         
         # Find student by email (user_id is actually email from frontend)
         student = await users_collection.find_one({
@@ -271,19 +302,26 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
         prediction = model.predict(features)[0]
         probability = model.predict_proba(features)[0][1]
         
-        # Extract SHAP explanations
-        shap_values = explainer.shap_values(features)
+        # Extract SHAP explanations (only if explainer is available)
+        shap_values = None
+        if current_explainer:
+            try:
+                shap_values = current_explainer.shap_values(features)
+            except Exception as e:
+                logger.warning(f"Failed to compute SHAP values: {e}")
         
         # Format explanation
         feature_impact = []
-        for i, col in enumerate(features.columns):
-            impact = float(shap_values[0][i])
-            feature_impact.append({
-                "feature": col,
-                "value": float(features.iloc[0, i]),
-                "shap_impact": impact,
-                "human_readable": f"The '{col}' value of {float(features.iloc[0, i]):.2f} {'increased' if impact > 0 else 'decreased'} risk by {abs(impact):.3f}."
-            })
+        if shap_values is not None:
+            for i, col in enumerate(features.columns):
+                impact = float(shap_values[0][i])
+                feature_value = float(cast(Any, features.iloc[0, i]))
+                feature_impact.append({
+                    "feature": col,
+                    "value": feature_value,
+                    "shap_impact": impact,
+                    "human_readable": f"The '{col}' value of {feature_value:.2f} {'increased' if impact > 0 else 'decreased'} risk by {abs(impact):.3f}."
+                })
         
         return {
             "user_id": user_id,

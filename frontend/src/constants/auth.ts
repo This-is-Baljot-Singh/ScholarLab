@@ -10,7 +10,7 @@ export const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrator',
 };
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const ACCESS_TOKEN_KEY = 'scholarlab_access_token';
 export const REFRESH_TOKEN_KEY = 'scholarlab_refresh_token';

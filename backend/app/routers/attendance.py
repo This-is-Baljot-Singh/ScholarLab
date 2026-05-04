@@ -12,6 +12,8 @@ from bson import ObjectId
 import logging
 from app.services.curriculum_engine import process_curriculum_unlocks
 from app.routers.websockets import manager
+# Faculty real-time event system
+from app.services.websocket import faculty_manager
 
 # WebAuthn Imports
 from webauthn import verify_authentication_response
@@ -69,6 +71,15 @@ async def verify_and_log_attendance(payload: AttendancePayload, request: Request
         )
     except Exception as e:
         logger.error(f"Spoofing attempt detected. WebAuthn Error: {str(e)}")
+        # Broadcast spoofing alert to faculty watching this session in real-time
+        try:
+            spoof_event = faculty_manager.make_spoofing_attempt(
+                session_id=payload.session_id,
+                reason=f"WebAuthn biometric verification failed: {str(e)[:120]}",
+            )
+            await faculty_manager.broadcast_to_session(payload.session_id, spoof_event)
+        except Exception as ws_err:
+            logger.error(f"Failed to broadcast spoofing event: {ws_err}")
         raise HTTPException(status_code=403, detail="Biometric verification failed. Integrity compromised.")
 
     # ==========================================
@@ -101,12 +112,17 @@ async def verify_and_log_attendance(payload: AttendancePayload, request: Request
     # ==========================================
     # PHASE 3: CONTEXTUAL HEURISTICS (Velocity & Network)
     # ==========================================
-    verify_network_environment(payload.bssid, geofence.get("expected_bssids", []))
+    network_passed = verify_network_environment(payload.bssid, geofence.get("expected_bssids", []))
     await verify_kinematic_velocity(user_id, payload.latitude, payload.longitude, current_time)
 
     # ==========================================
     # PHASE 4: IMMUTABLE LOG CREATION
     # ==========================================
+    status_val = "verified" if network_passed else "moderate"
+    metadata = {}
+    if not network_passed:
+        metadata["flag_reason"] = "Layer 4: Network Mismatch"
+
     log_entry = {
         "user_id": user_id,
         "session_id": payload.session_id,
@@ -114,33 +130,128 @@ async def verify_and_log_attendance(payload: AttendancePayload, request: Request
         "timestamp": current_time,
         "coordinates": {"latitude": payload.latitude, "longitude": payload.longitude},
         "network": {"bssid": payload.bssid, "ip_address": request.client.host},
-        "status": "verified"
+        "status": status_val,
+        "metadata": metadata
     }
 
     result = await attendance_collection.insert_one(log_entry)
-    
-    # ==========================================
-    # PHASE 5: EVENT-DRIVEN CURRICULUM SYNC
-    # ==========================================
-    try:
-        # Traverse Knowledge Graph
-        unlocked_items = await process_curriculum_unlocks(user_id, payload.session_id)
-        
-        # Push each unlocked item to the user's active WebSocket session
-        for item in unlocked_items:
-            ws_payload = {
-                "type": "curriculum:unlocked",
-                "payload": {
-                    "message": "Cryptography Verified. Material Unlocked.",
-                    "curriculumItem": item
-                }
-            }
-            # This directly targets ONLY the student who marked attendance
-            await manager.send_personal_message(ws_payload, user_id)
-            
-    except Exception as e:
-        logger.error(f"Curriculum Sync Failed for {user_id}: {str(e)}")
-        # We don't raise an HTTPException here because the attendance itself was successful.
-        # We fail gracefully on the sync side.
 
-    return {"message": "Presence verified cryptographically.", "log_id": str(result.inserted_id)}
+    # ==========================================
+    # PHASE 5a: FACULTY REAL-TIME BROADCAST
+    # ==========================================
+    if network_passed:
+        try:
+            # Count total verified attendances for this session so the faculty
+            # dashboard can show a live running total without a separate query.
+            session_attendance_count = await attendance_collection.count_documents({
+                "session_id": payload.session_id,
+                "status": "verified",
+            })
+
+            verified_event = faculty_manager.make_attendance_verified(
+                student_id=user_id,
+                student_name=user.get("full_name", "Unknown Student"),
+                session_id=payload.session_id,
+                attendance_count=session_attendance_count,
+            )
+            await faculty_manager.broadcast_to_session(payload.session_id, verified_event)
+        except Exception as e:
+            # Fail gracefully — the student's attendance is already logged.
+            logger.error(f"Faculty WS broadcast failed for session {payload.session_id}: {e}")
+
+    # ==========================================
+    # PHASE 5b: EVENT-DRIVEN CURRICULUM SYNC
+    # ==========================================
+    if network_passed:
+        try:
+            # Traverse Knowledge Graph
+            unlocked_items = await process_curriculum_unlocks(user_id, payload.session_id)
+
+            # Push each unlocked item to the student's own active WebSocket session
+            for item in unlocked_items:
+                ws_payload = {
+                    "type": "curriculum:unlocked",
+                    "payload": {
+                        "message": "Cryptography Verified. Material Unlocked.",
+                        "curriculumItem": item
+                    }
+                }
+                # This directly targets ONLY the student who marked attendance
+                await manager.send_personal_message(ws_payload, user_id)
+
+        except Exception as e:
+            logger.error(f"Curriculum Sync Failed for {user_id}: {str(e)}")
+            # We don't raise an HTTPException here because the attendance itself was successful.
+            # We fail gracefully on the sync side.
+
+    msg = "Presence verified cryptographically." if network_passed else "Presence logged. Pending network environment audit."
+    return {"message": msg, "log_id": str(result.inserted_id)}
+
+# ==========================================
+# AUDIT TRAIL ENDPOINTS
+# ==========================================
+
+@router.get("/audit-queue")
+async def get_audit_queue(current_user: dict = Depends(require_role([RoleEnum.faculty, RoleEnum.admin]))):
+    records = await attendance_collection.find({"status": "moderate"}).to_list(100)
+    
+    response = []
+    for r in records:
+        try:
+            uid = ObjectId(r["user_id"])
+        except:
+            uid = r["user_id"]
+            
+        user = await users_collection.find_one({"_id": uid})
+        user_name = user.get("full_name", "Unknown Student") if user else "Unknown Student"
+        
+        timestamp = r["timestamp"]
+        if isinstance(timestamp, datetime):
+            timestamp_str = timestamp.isoformat()
+        else:
+            timestamp_str = str(timestamp)
+
+        response.append({
+            "id": str(r["_id"]),
+            "studentId": str(r["user_id"]),
+            "studentName": user_name,
+            "sessionId": str(r["session_id"]),
+            "timestamp": timestamp_str,
+            "metadata": r.get("metadata", {})
+        })
+    return response
+
+class AuditActionPayload(BaseModel):
+    approve: bool
+    justification: str
+
+@router.post("/audit/{log_id}")
+async def process_audit(log_id: str, payload: AuditActionPayload, current_user: dict = Depends(require_role([RoleEnum.faculty, RoleEnum.admin]))):
+    if not payload.justification or not payload.justification.strip():
+        raise HTTPException(status_code=400, detail="Justification is required.")
+        
+    try:
+        obj_id = ObjectId(log_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid log ID format.")
+        
+    record = await attendance_collection.find_one({"_id": obj_id})
+    if not record:
+        raise HTTPException(status_code=404, detail="Audit record not found.")
+        
+    if record.get("status") != "moderate":
+        raise HTTPException(status_code=400, detail="Record is not pending audit.")
+        
+    new_status = "verified" if payload.approve else "rejected"
+    
+    await attendance_collection.update_one(
+        {"_id": obj_id},
+        {"$set": {
+            "status": new_status,
+            "audit_justification": payload.justification,
+            "audited_by": str(current_user["_id"]),
+            "audited_at": datetime.now(timezone.utc)
+        }}
+    )
+    
+    return {"message": f"Audit complete. Status set to {new_status}."}

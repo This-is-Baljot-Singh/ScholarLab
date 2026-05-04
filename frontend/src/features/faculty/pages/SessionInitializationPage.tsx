@@ -2,14 +2,23 @@ import React, { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { SessionInitializer } from '../components';
+import { SessionCloseModal } from '../components';
 import { toast } from 'sonner';
-import type { LiveSession, SessionInitPayload, CurriculumGraph, GeofenceWithMetadata } from '@/types/faculty';
+import type {
+  LiveSession,
+  SessionInitPayload,
+  CurriculumGraph,
+  GeofenceWithMetadata,
+} from '@/types/faculty';
 
 interface SessionInitializationPageProps {
   onBack: () => void;
 }
 
-export const SessionInitializationPage: React.FC<SessionInitializationPageProps> = ({ onBack }) => {
+export const SessionInitializationPage: React.FC<SessionInitializationPageProps> = ({
+  onBack,
+}) => {
+  // ── Active sessions ──────────────────────────────────────────────────────
   const [activeSessions, setActiveSessions] = useState<LiveSession[]>([
     {
       id: 'session-1',
@@ -23,6 +32,7 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
     },
   ]);
 
+  // ── Curriculum graphs (mock; replace with useQuery once backend is wired) ─
   const [graphs] = useState<CurriculumGraph[]>([
     {
       id: 'graph-1',
@@ -74,6 +84,7 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
     },
   ]);
 
+  // ── Geofences ────────────────────────────────────────────────────────────
   const [geofences] = useState<GeofenceWithMetadata[]>([
     {
       type: 'circle',
@@ -87,7 +98,7 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
     },
     {
       type: 'circle',
-      center: { latitude: 40.1120, longitude: -88.2100 },
+      center: { latitude: 40.112, longitude: -88.21 },
       radiusMeters: 200,
       id: 'geofence-2',
       name: 'Science Building',
@@ -96,6 +107,19 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
       updatedAt: new Date().toISOString(),
     },
   ]);
+
+  // ── Session-Close Modal state ─────────────────────────────────────────────
+  /**
+   * When faculty clicks "End Session" on an active session card, we store the
+   * session here instead of immediately removing it. The SessionCloseModal
+   * opens, faculty selects covered nodes, then fires the API. Only after a
+   * successful response do we remove the session from the active list.
+   */
+  const [sessionPendingClose, setSessionPendingClose] = useState<LiveSession | null>(
+    null,
+  );
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const handleStartSession = (payload: SessionInitPayload) => {
     const newSession: LiveSession = {
@@ -108,20 +132,50 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
       status: 'active',
       attendanceCount: 0,
     };
-
     setActiveSessions((prev) => [...prev, newSession]);
     toast.success(`Session started! Lecture ID: ${payload.lectureId}`);
   };
 
+  /**
+   * Intercept the End Session action — open the SessionCloseModal instead of
+   * immediately removing the session from state. The session is only removed
+   * after the faculty confirms and the API call succeeds (handleCloseConfirm).
+   */
   const handleEndSession = (sessionId: string) => {
-    setActiveSessions((prev) => {
-      const session = prev.find((s) => s.id === sessionId);
-      if (session) {
-        toast.success(`Session ended. Final attendance: ${session.attendanceCount} students`);
-      }
-      return prev.filter((s) => s.id !== sessionId);
-    });
+    const session = activeSessions.find((s) => s.id === sessionId);
+    if (session) {
+      setSessionPendingClose(session);
+    }
   };
+
+  /** Called by SessionCloseModal after a successful POST to the backend */
+  const handleCloseConfirm = () => {
+    if (!sessionPendingClose) return;
+    const attendanceCount = sessionPendingClose.attendanceCount;
+    setActiveSessions((prev) =>
+      prev.filter((s) => s.id !== sessionPendingClose.id),
+    );
+    toast.success(
+      `Session closed. Final attendance: ${attendanceCount} student${
+        attendanceCount !== 1 ? 's' : ''
+      }`,
+    );
+    setSessionPendingClose(null);
+  };
+
+  /** Called when faculty cancels the modal — session stays active */
+  const handleCloseCancel = () => {
+    setSessionPendingClose(null);
+  };
+
+  // Find the curriculum graph associated with the session being closed
+  const graphForClosingSession = sessionPendingClose
+    ? (graphs.find((g) =>
+        g.nodes.some((n) => n.id === sessionPendingClose.currentCurriculumNodeId),
+      ) ?? graphs[0] ?? null)
+    : null;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col bg-slate-50">
@@ -149,6 +203,18 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
           onEndSession={handleEndSession}
         />
       </div>
+
+      {/* Session-Close Modal — rendered only when a session is pending close */}
+      {sessionPendingClose && graphForClosingSession && (
+        <SessionCloseModal
+          sessionId={sessionPendingClose.id}
+          graph={graphForClosingSession}
+          preCompletedNodeIds={[]}
+          isOpen={true}
+          onCancel={handleCloseCancel}
+          onConfirm={handleCloseConfirm}
+        />
+      )}
     </div>
   );
 };

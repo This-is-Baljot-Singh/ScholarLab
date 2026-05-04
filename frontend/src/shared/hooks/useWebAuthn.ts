@@ -57,7 +57,7 @@ export const useWebAuthn = () => {
       setError(null);
       
       // Fetch fresh challenge for this specific attendance session
-      const { data: options } = await apiClient.post('/api/auth/webauthn/authenticate/options', { email });
+      const { data: options } = await apiClient.post('/api/auth/webauthn/generate-authentication-options', { email });
       
       // Request user's biometric signature
       const assertionResponse: AuthenticationResponseJSON = await startAuthentication(options);

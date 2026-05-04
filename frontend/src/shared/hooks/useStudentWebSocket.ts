@@ -1,70 +1,62 @@
-// ScholarLab/frontend/src/shared/hooks/useStudentWebSocket.ts
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { toast } from 'sonner';
-import { useAuthStore } from '@/store/authStore';
-import type { CurriculumItem } from '@/types/student';
 
-interface CurriculumUnlockedEvent {
-  curriculumItem: CurriculumItem;
-  message: string;
+interface WebSocketMessage {
+  type: string;
+  payload: any;
 }
 
-export const useStudentWebSocket = (enabled: boolean = true) => {
-  const wsRef = useRef<WebSocket | null>(null);
+export const useStudentWebSocket = () => {
+  const { token, isAuthenticated } = useAuth();
+  const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [unlockedItems, setUnlockedItems] = useState<CurriculumItem[]>([]);
-  
-  // Grab the token to authenticate the WS connection
-  const tokens = useAuthStore((state) => state.tokens);
-  const token = tokens?.accessToken;
 
   useEffect(() => {
-    if (!enabled || !token) return;
+    if (!isAuthenticated || !token) return;
 
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('http', 'ws') || 'ws://localhost:8000/api';
-    // Append the token as a query parameter for the FastAPI backend
-    const wsUrl = `${baseUrl}/ws/student?token=${token}`;
-    
-    const socket = new WebSocket(wsUrl);
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/student?token=${token}`;
 
-    socket.onopen = () => {
-      setIsConnected(true);
-      // Removed the toast success here so it doesn't spam the user on silent reconnects
-    };
+    const connect = () => {
+      ws.current = new WebSocket(wsUrl);
 
-    socket.onclose = () => setIsConnected(false);
+      ws.current.onopen = () => {
+        setIsConnected(true);
+        console.log('Real-time curriculum sync established.');
+      };
 
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'curriculum:unlocked') {
-          const payload = data.payload as CurriculumUnlockedEvent;
-          setUnlockedItems((prev) => [...prev, payload.curriculumItem]);
-          toast.success(payload.message || 'New curriculum unlocked!', {
-            description: payload.curriculumItem.title,
-            duration: 5000,
-          });
+      ws.current.onmessage = (event) => {
+        try {
+          const data: WebSocketMessage = JSON.parse(event.data);
+          
+          if (data.type === 'curriculum:unlocked') {
+            toast.success(data.payload.message, {
+              description: `Unlocked: ${data.payload.curriculumItem.title}`,
+              duration: 5000,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to parse WebSocket message', error);
         }
-      } catch (err) {
-        console.error("Failed to parse websocket message", err);
-      }
+      };
+
+      ws.current.onclose = (event) => {
+        setIsConnected(false);
+        if (event.code !== 1008) {
+          setTimeout(connect, 3000);
+        }
+      };
     };
 
-    wsRef.current = socket;
+    connect();
 
     return () => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
+      if (ws.current) {
+        ws.current.close();
       }
     };
-  }, [enabled, token]);
+  }, [isAuthenticated, token]);
 
-  const emitAttendanceMarked = useCallback((lectureId: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'attendance:marked', payload: { lectureId } }));
-    }
-  }, []);
-
-  return { isConnected, unlockedItems, emitAttendanceMarked };
+  return { isConnected };
 };

@@ -119,3 +119,50 @@ export interface FacultyDashboard {
     atRiskStudents: StudentRiskData[];
   };
 }
+
+// ---------------------------------------------------------------------------
+// Session-Close Workflow Types
+// (mirror backend/app/routers/curriculum.py Pydantic schemas)
+// ---------------------------------------------------------------------------
+
+/** Payload sent to POST /api/curriculum/session/close */
+export interface SessionClosePayload {
+  /** The live session being closed */
+  session_id: string;
+  /** IDs of curriculum nodes covered during this session (faculty selection) */
+  node_ids: string[];
+  /** Optional: parent curriculum graph ID, for context */
+  graph_id?: string;
+}
+
+/** Response returned immediately (before background task completes) */
+export interface SessionCloseResponse {
+  session_id: string;
+  /** Number of curriculum nodes atomically marked as completed */
+  nodes_completed: number;
+  /** Number of students whose risk features will be updated asynchronously */
+  absent_students: number;
+  /** UUID for tracing the async risk-feature recomputation task */
+  background_task_id: string;
+}
+
+// ---------------------------------------------------------------------------
+// Anti-Spoofing Audit Trail Types
+// ---------------------------------------------------------------------------
+
+export interface AuditQueueRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  sessionId: string;
+  timestamp: string;
+  metadata: {
+    flag_reason?: string;
+    [key: string]: any;
+  };
+}
+
+export interface AuditActionPayload {
+  approve: boolean;
+  justification: string;
+}

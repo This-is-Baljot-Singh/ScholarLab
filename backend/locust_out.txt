@@ -1,0 +1,149 @@
+[2026-05-03 19:03:33,629] FaTaLiTy/INFO/locust.main: Starting Locust 2.43.4
+[2026-05-03 19:03:33,630] FaTaLiTy/INFO/locust.main: Run time limit set to 15 seconds
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         0     0(0.00%) |      0       0       0      0 |    0.00        0.00
+
+[2026-05-03 19:03:33,630] FaTaLiTy/INFO/locust.runners: Ramping to 15 users at a rate of 5.00 per second
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxM30.nYGtUbT5DU3MOepTGEE8Jjom46o4XJWh3TxjKRbQUHI
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNH0.T9MF0dFlN3a8Kbu5n39hlSqUfR4K-K_C8u231togVlU
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNH0.T9MF0dFlN3a8Kbu5n39hlSqUfR4K-K_C8u231togVlU
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNH0.T9MF0dFlN3a8Kbu5n39hlSqUfR4K-K_C8u231togVlU
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNH0.T9MF0dFlN3a8Kbu5n39hlSqUfR4K-K_C8u231togVlU
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                    5     0(0.00%) |   1141    1138    1144   1138 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         5     0(0.00%) |   1141    1138    1144   1138 |    0.00        0.00
+
+[2026-05-03 19:03:35,632] FaTaLiTy/INFO/locust.runners: All users spawned: {"StudentUser": 15} (15 total users)
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Starting user login...
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNX0.csTNCyAchX6uAXRyjm5DbFfAgfTG0gZe3zgMuG3yjLw
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNX0.csTNCyAchX6uAXRyjm5DbFfAgfTG0gZe3zgMuG3yjLw
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNX0.csTNCyAchX6uAXRyjm5DbFfAgfTG0gZe3zgMuG3yjLw
+WS Connected!
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNX0.csTNCyAchX6uAXRyjm5DbFfAgfTG0gZe3zgMuG3yjLw
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNX0.csTNCyAchX6uAXRyjm5DbFfAgfTG0gZe3zgMuG3yjLw
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNn0.TsZ4i2MWcitR7raVFWTvaRMkQ57rvqglVrM1n7C4gG8
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNn0.TsZ4i2MWcitR7raVFWTvaRMkQ57rvqglVrM1n7C4gG8
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNn0.TsZ4i2MWcitR7raVFWTvaRMkQ57rvqglVrM1n7C4gG8
+WS Connected!
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxNn0.TsZ4i2MWcitR7raVFWTvaRMkQ57rvqglVrM1n7C4gG8
+Login successful for deepika.chopra0, token: eyJhbGciOi...
+Connecting to WS: ws://127.0.0.1:8000/api/ws/student?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWVwaWthLmNob3ByYTBAc2Nob2xhcmxhYi5lZHUiLCJyb2xlIjoic3R1ZGVudCIsImV4cCI6MTc3NzgxNzAxN30.dQcFpAZeTj-JkGqBeFjnKboyOoltf0Foe92FyLQEeyM
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+WS Connected!
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    2.50        0.00
+POST     /attendance/verify                                                                15     0(0.00%) |     18       7      28     20 |    0.00        0.00
+POST     /webauthn/generate-authentication-options                                         15     0(0.00%) |    462      17    1163     30 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        45     0(0.00%) |    587       7    1427     30 |    2.50        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    2.50        0.00
+POST     /attendance/verify                                                                27     0(0.00%) |     12       2      28      9 |    0.00        0.00
+POST     /webauthn/generate-authentication-options                                         27     0(0.00%) |    259       3    1163     22 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        69     0(0.00%) |    385       2    1427     21 |    2.50        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    2.50        0.00
+POST     /attendance/verify                                                                44     0(0.00%) |      9       2      28      7 |    3.83        0.00
+POST     /webauthn/generate-authentication-options                                         44     0(0.00%) |    161       3    1163      6 |    3.83        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       103     0(0.00%) |    259       2    1427      7 |   10.17        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    1.88        0.00
+POST     /attendance/verify                                                                56     0(0.00%) |      8       2      28      6 |    4.50        0.00
+POST     /webauthn/generate-authentication-options                                         56     0(0.00%) |    128       3    1163      6 |    4.50        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       127     0(0.00%) |    211       2    1427      7 |   10.88        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    1.50        0.00
+POST     /attendance/verify                                                                70     0(0.00%) |      8       2      28      6 |    5.20        0.00
+POST     /webauthn/generate-authentication-options                                         70     0(0.00%) |    103       3    1163      6 |    5.20        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       155     0(0.00%) |    174       2    1427      6 |   11.90        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    1.00        0.00
+POST     /attendance/verify                                                                85     0(0.00%) |      7       2      28      6 |    6.50        0.00
+POST     /webauthn/generate-authentication-options                                         85     0(0.00%) |     86       3    1163      6 |    6.50        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       185     0(0.00%) |    147       2    1427      6 |   14.00        0.00
+
+[2026-05-03 19:03:48,492] FaTaLiTy/INFO/locust.main: --run-time limit reached, shutting down
+
+==================================================
+IEEE Evaluation Metrics
+==================================================
+Verification Endpoint 95th Percentile Latency (P95): 1200 ms
+==================================================
+
+[2026-05-03 19:03:48,516] FaTaLiTy/INFO/locust.main: Shutting down (exit code 0)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+POST     /api/auth/login                                                                   15     0(0.00%) |   1281    1138    1427   1300 |    1.02        0.00
+POST     /attendance/verify                                                                95     0(0.00%) |      7       2      28      6 |    6.44        0.00
+POST     /webauthn/generate-authentication-options                                         95     0(0.00%) |     77       3    1163      6 |    6.44        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       205     0(0.00%) |    133       2    1427      6 |   13.89        0.00
+
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+POST     /api/auth/login                                                                      1300   1300   1400   1400   1400   1400   1400   1400   1400   1400   1400     15
+POST     /attendance/verify                                                                      6      7      7      9     15     21     27     28     28     28     28     95
+POST     /webauthn/generate-authentication-options                                               6      7      7      8     24   1200   1200   1200   1200   1200   1200     95
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+         Aggregated                                                                              6      7      8     15    480   1200   1400   1400   1400   1400   1400    205
+

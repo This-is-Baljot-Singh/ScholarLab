@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 # --- Enums ---
@@ -51,7 +51,7 @@ class AttendanceLog(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     user_id: str
     session_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     validated_coordinates: Dict[str, float] # {"lat": float, "lng": float}
     device_fingerprint: str # E.g., BSSID or hardware signature [cite: 99]
     is_spoofed: bool = False

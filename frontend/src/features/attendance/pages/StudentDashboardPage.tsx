@@ -1,180 +1,143 @@
-import React, { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Bell } from 'lucide-react';
-import { apiClient } from '@/api/client';
+import React, { useState } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { useStudentWebSocket } from '@/shared/hooks/useStudentWebSocket';
-import { ActiveSessionCard } from '../components/ActiveSessionCard';
-import { CurriculumGrid } from '@/features/curriculum/components/CurriculumGrid';
-import { AttendanceHistory } from '../components/AttendanceHistory';
-import { SkeletonLoader } from '@/shared/ui/SkeletonLoader';
-import type { StudentDashboard, CurriculumItem } from '@/types/student';
+import { MarkAttendanceFlow } from '../components/MarkAttendanceFlow';
+import { Loader2, Wifi, WifiOff, BookOpen, Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/api/client';
+
+// Define the type for the curriculum item based on your MongoDB schema
+interface UnlockedModule {
+  id: string;
+  course_id: string;
+  title: string;
+  unlocked_at: string;
+  resource_uris: string[];
+}
 
 export const StudentDashboardPage: React.FC = () => {
-  const [unlockedCurriculum, setUnlockedCurriculum] = useState<CurriculumItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'session' | 'curriculum' | 'attendance'>(
-    'session'
-  );
+  const user = useAuthStore((state) => state.user);
+  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<{ sessionId: string; geofenceId: string } | null>(null);
+  
+  // Initialize the WebSocket connection for real-time curriculum unlocks
+  const { isConnected } = useStudentWebSocket();
 
-  const { data: dashboard, isLoading, isError } = useQuery<StudentDashboard>({
-    queryKey: ['student-dashboard'],
-    queryFn: () => apiClient.get('/student/dashboard').then((res) => res.data),
+  // Fetch recently unlocked curriculum modules
+  // This query will be automatically invalidated and refetched by the WebSocket hook 
+  // when a 'curriculum:unlocked' event is received.
+  const { data: recentUnlocks, isLoading: isLoadingUnlocks } = useQuery<UnlockedModule[]>({
+    queryKey: ['recent-unlocks'],
+    queryFn: async () => {
+      const response = await apiClient.get('/student/curriculum/recent');
+      return response.data;
+    },
   });
 
-  const {
-    isConnected,
-    emitAttendanceMarked,
-    unlockedItems,
-  } = useStudentWebSocket(true);
-
-  useEffect(() => {
-    if (unlockedItems.length > 0) {
-      setUnlockedCurriculum((prev) => {
-        const newItems = unlockedItems.filter(
-          (item) => !prev.find((p) => p.id === item.id)
-        );
-        return [...prev, ...newItems];
-      });
-    }
-  }, [unlockedItems]);
-
-  const handleAttendanceMarked = () => {
-    if (dashboard?.activeSession?.lecture.id) {
-      emitAttendanceMarked(dashboard.activeSession.lecture.id);
-    }
-  };
-
-  if (isError) {
+  if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-slate-900">Unable to load dashboard</p>
-          <p className="mt-1 text-sm text-slate-600">Please try again later</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="mt-0.5 text-xs text-slate-600">
-              {isConnected ? '🟢 Connected' : '⚫ Offline'}
-            </p>
-          </div>
-          <button className="relative rounded-lg bg-slate-100 p-2 transition-colors hover:bg-slate-200">
-            <Bell className="h-5 w-5 text-slate-700" />
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              2
-            </span>
-          </button>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Student Portal</h1>
+          <p className="text-slate-600 mt-1">Welcome back, {user.name}</p>
         </div>
-      </header>
+        
+        {/* Real-time connection status indicator */}
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm border border-slate-200">
+          {isConnected ? (
+            <>
+              <Wifi className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium text-slate-700">Sync Active</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-medium text-slate-500">Reconnecting...</span>
+            </>
+          )}
+        </div>
+      </div>
 
-      {/* Content */}
-      <main className="px-4 py-6">
-        {isLoading ? (
-          <div className="space-y-4">
-            <SkeletonLoader height="h-40" />
-            <SkeletonLoader height="h-32" count={2} />
-          </div>
-        ) : (
-          <>
-            {/* Tab Navigation */}
-            <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-              {([
-                { id: 'session', label: '🎓 Active Session' },
-                { id: 'curriculum', label: '📚 Curriculum' },
-                { id: 'attendance', label: '📊 History' },
-              ] as const).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? 'active:scale-95 bg-indigo-600 text-white shadow-md'
-                      : 'bg-white text-slate-700 border border-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          {/* Main Attendance Marking Component */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+              <h2 className="text-xl font-semibold text-slate-800">Active Sessions</h2>
+              <p className="text-sm text-slate-500">Verify your physical presence to unlock curriculum materials.</p>
             </div>
+            <div className="p-6">
+              <MarkAttendanceFlow
+                isOpen={isAttendanceOpen}
+                sessionId={selectedSession?.sessionId || ''}
+                geofenceId={selectedSession?.geofenceId || ''}
+                userEmail={user?.email || ''}
+                onClose={() => setIsAttendanceOpen(false)}
+                onSuccess={() => {
+                  setIsAttendanceOpen(false);
+                  setSelectedSession(null);
+                }}
+              />
+            </div>
+          </div>
+        </div>
 
-            {/* Active Session Tab */}
-            {activeTab === 'session' &&
-              (dashboard?.activeSession ? (
-                <ActiveSessionCard
-                  session={dashboard.activeSession}
-                  onAttendanceMarked={handleAttendanceMarked}
-                />
+        <div className="space-y-6">
+          {/* Curriculum Preview / Stats Widget */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-lg font-semibold text-slate-800">Recent Unlocks</h3>
+            </div>
+            
+            <div className="space-y-4">
+              {isLoadingUnlocks ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : recentUnlocks && recentUnlocks.length > 0 ? (
+                <div className="space-y-3">
+                  {recentUnlocks.slice(0, 5).map((module) => (
+                    <div 
+                      key={module.id} 
+                      className="p-4 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors shadow-sm"
+                    >
+                      <p className="text-xs font-bold text-indigo-600 mb-1 uppercase tracking-wider">
+                        {module.course_id}
+                      </p>
+                      <p className="text-sm font-medium text-slate-800 line-clamp-2">
+                        {module.title}
+                      </p>
+                      <div className="flex items-center gap-1 mt-3 text-xs text-slate-500">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{new Date(module.unlocked_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="rounded-2xl bg-slate-100 p-8 text-center">
-                  <p className="text-slate-600">No active sessions right now</p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Check back later for upcoming lectures
+                <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200 border-dashed">
+                  <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500 font-medium">
+                    No recent unlocks found.
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 px-4">
+                    Verify your attendance today to reveal new curriculum modules.
                   </p>
                 </div>
-              ))}
-
-            {/* Curriculum Tab */}
-            {activeTab === 'curriculum' && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                    Unlocked Materials
-                  </h2>
-                  {dashboard?.unlockedCurriculum &&
-                  dashboard.unlockedCurriculum.length > 0 ? (
-                    <CurriculumGrid
-                      items={[...dashboard.unlockedCurriculum, ...unlockedCurriculum]}
-                      onItemClick={(item) => {
-                        if (item.url) {
-                          window.open(item.url, '_blank');
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div className="rounded-lg bg-slate-100 p-6 text-center">
-                      <p className="text-slate-600">No curriculum unlocked yet</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Mark attendance in class to unlock materials
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* New Unlocked Items Notification */}
-                {unlockedCurriculum.length > 0 && (
-                  <div className="rounded-lg border-l-4 border-green-600 bg-green-50 p-4">
-                    <p className="text-sm font-semibold text-green-800">
-                      ✨ {unlockedCurriculum.length} new item
-                      {unlockedCurriculum.length !== 1 ? 's' : ''} unlocked!
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Attendance Tab */}
-            {activeTab === 'attendance' && (
-              <AttendanceHistory records={dashboard?.recentAttendance || []} />
-            )}
-          </>
-        )}
-      </main>
-
-      {/* Floating Action Button for Quick Access */}
-      {dashboard?.activeSession && (
-        <div className="fixed bottom-20 right-4 animate-bounce">
-          <button className="h-14 w-14 rounded-full bg-indigo-600 text-white shadow-lg transition-all duration-200 hover:scale-110 active:scale-95">
-            <span className="text-2xl">👆</span>
-          </button>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

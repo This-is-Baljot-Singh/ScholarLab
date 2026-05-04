@@ -53,3 +53,15 @@ export const useUserRole = () => {
   const user = useAuthStore((state) => state.user);
   return user?.role;
 };
+
+export const useAuth = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const token = useAuthStore((state) => state.tokens?.accessToken);
+  const user = useAuthStore((state) => state.user);
+
+  return {
+    isAuthenticated,
+    token,
+    user,
+  };
+};

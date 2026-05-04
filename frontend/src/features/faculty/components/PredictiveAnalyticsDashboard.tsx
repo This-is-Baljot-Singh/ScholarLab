@@ -2,22 +2,75 @@ import React from 'react';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
-import { Users, AlertTriangle, ShieldAlert, TrendingUp, Loader2 } from 'lucide-react';
+import { Users, AlertTriangle, ShieldAlert, TrendingUp, Loader2, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { AttendanceTrendsChart } from './AttendanceTrendsChart';
 import { AtRiskStudentsList } from './AtRiskStudentsList';
+import { useFacultyWebSocket } from '@/hooks/useFacultyWebSocket';
+import type { WSConnectionState } from '@/types/websocket';
 
-export const PredictiveAnalyticsDashboard: React.FC = () => {
-  // 1. Fetch ML Analytics Data
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+interface PredictiveAnalyticsDashboardProps {
+  /** The active lecture session_id to subscribe the WS to. Null = no live feed. */
+  sessionId?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// WS connection status badge
+// ---------------------------------------------------------------------------
+
+const CONNECTION_CONFIG: Record<
+  WSConnectionState,
+  { label: string; dot: string; text: string }
+> = {
+  connected:    { label: 'Live',          dot: 'bg-emerald-500 animate-pulse', text: 'text-emerald-700' },
+  connecting:   { label: 'Connecting…',   dot: 'bg-amber-400 animate-pulse',   text: 'text-amber-700'   },
+  reconnecting: { label: 'Reconnecting…', dot: 'bg-amber-400 animate-pulse',   text: 'text-amber-700'   },
+  failed:       { label: 'Disconnected',  dot: 'bg-red-500',                   text: 'text-red-700'     },
+  closed:       { label: 'Offline',       dot: 'bg-slate-400',                 text: 'text-slate-500'   },
+};
+
+const WSStatusBadge: React.FC<{ state: WSConnectionState }> = ({ state }) => {
+  const cfg = CONNECTION_CONFIG[state];
+  const Icon = state === 'connected'
+    ? Wifi
+    : state === 'reconnecting' || state === 'connecting'
+      ? RefreshCw
+      : WifiOff;
+
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cfg.text} border-current/20 bg-current/5`}>
+      <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+      <Icon className="h-3 w-3" />
+      {cfg.label}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export const PredictiveAnalyticsDashboard: React.FC<PredictiveAnalyticsDashboardProps> = ({
+  sessionId = null,
+}) => {
+  // 1. WebSocket — real-time event stream
+  const { connectionState } = useFacultyWebSocket({ sessionId });
+
+  // 2. Fetch ML Analytics Data (polling removed — WS invalidations drive refresh)
   const { data: analytics, isLoading, isError } = useQuery({
     queryKey: ['ml-analytics-overview'],
     queryFn: async () => {
       const response = await apiClient.get('/analytics/overview');
       return response.data;
     },
-    // Refresh data every 5 minutes in production
-    refetchInterval: 300000, 
+    // Keep a gentle 5-minute background refresh as fallback if WS drops
+    refetchInterval: 300_000,
+    staleTime: 60_000,
   });
 
   if (isLoading) {
@@ -40,14 +93,31 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
 
   // Format risk distribution data for pie chart
   const riskDistribution = [
-    { name: 'Safe', value: campus_aggregate.total_students_tracked - campus_aggregate.students_at_risk },
+    { name: 'Safe',    value: campus_aggregate.total_students_tracked - campus_aggregate.students_at_risk },
     { name: 'At Risk', value: campus_aggregate.students_at_risk },
   ];
+
   return (
     <div className="space-y-6 px-6 py-6">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900">Predictive Analytics Engine</h2>
-        <p className="text-sm text-slate-500">Powered by XGBoost & Spatial Telemetry</p>
+      {/* Header row with live WS status badge */}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Predictive Analytics Engine</h2>
+          <p className="text-sm text-slate-500">Powered by XGBoost &amp; Spatial Telemetry</p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <WSStatusBadge state={connectionState} />
+          {sessionId && (
+            <span className="text-xs text-slate-400 font-mono">
+              session: {sessionId.slice(0, 8)}…
+            </span>
+          )}
+          {!sessionId && (
+            <span className="text-xs text-slate-400 italic">
+              No active session — start a lecture to enable live feed
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Top Stats Row */}
@@ -106,7 +176,9 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
                   ))}
                 </Pie>
-                <RechartsTooltip />
+                <RechartsTooltip
+                  formatter={(value: number, name: string) => [value.toString(), name]}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -127,7 +199,7 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
                   {live_inference_demo.classification}
                 </span>
              </div>
-             
+
              <div className="space-y-3">
                <div>
                  <div className="flex justify-between text-xs mb-1">
@@ -135,8 +207,8 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
                    <span className="font-bold text-slate-700">{live_inference_demo.risk_score_percentage}%</span>
                  </div>
                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${live_inference_demo.risk_score_percentage > 50 ? 'bg-red-500' : 'bg-green-500'}`} 
+                    <div
+                      className={`h-2 rounded-full ${live_inference_demo.risk_score_percentage > 50 ? 'bg-red-500' : 'bg-green-500'}`}
                       style={{ width: `${live_inference_demo.risk_score_percentage}%` }}
                     ></div>
                  </div>
@@ -163,8 +235,16 @@ export const PredictiveAnalyticsDashboard: React.FC = () => {
   );
 };
 
+// ---------------------------------------------------------------------------
 // Simple Stat Card Component
-const StatCard = ({ title, value, icon: Icon, color, bgColor }: any) => (
+// ---------------------------------------------------------------------------
+const StatCard = ({ title, value, icon: Icon, color, bgColor }: {
+  title: string;
+  value: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+}) => (
   <div className="flex items-center rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
     <div className={`mr-4 flex h-12 w-12 items-center justify-center rounded-lg ${bgColor}`}>
       <Icon className={`h-6 w-6 ${color}`} />

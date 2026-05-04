@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Map, Zap, Play, BarChart3, Menu, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Map, Zap, Play, BarChart3, Menu, X, LogOut, ShieldAlert } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
+import { useAuthStore } from '@/store/authStore';
 
-type PageType = 'dashboard' | 'geofence' | 'curriculum' | 'session' | 'analytics';
+import { AuditQueuePanel } from '../components';
+
+type PageType = 'dashboard' | 'geofence' | 'curriculum' | 'session' | 'analytics' | 'audit';
 
 interface FacultyDashboardPageProps {
   onNavigate: (page: PageType) => void;
@@ -13,7 +17,14 @@ export const FacultyDashboardPage: React.FC<FacultyDashboardPageProps> = ({
   onNavigate,
   currentPage,
 }) => {
+  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const menuItems: Array<{
     id: PageType;
@@ -44,6 +55,12 @@ export const FacultyDashboardPage: React.FC<FacultyDashboardPageProps> = ({
       label: 'Analytics Dashboard',
       icon: <BarChart3 className="w-5 h-5" />,
       description: 'Predictive analytics & SHAP insights',
+    },
+    {
+      id: 'audit',
+      label: 'Audit Trail',
+      icon: <ShieldAlert className="w-5 h-5" />,
+      description: 'Review flagged attendance records',
     },
   ];
 
@@ -97,11 +114,18 @@ export const FacultyDashboardPage: React.FC<FacultyDashboardPageProps> = ({
 
         {/* User Info */}
         {sidebarOpen && (
-          <div className="border-t border-slate-200 p-4">
+          <div className="border-t border-slate-200 p-4 space-y-3">
             <div className="bg-indigo-50 rounded-lg p-3 text-sm">
               <p className="font-semibold text-slate-900">Dr. Sarah Chen</p>
               <p className="text-xs text-slate-600 mt-0.5">Faculty Member</p>
             </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors border border-red-200"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
           </div>
         )}
       </div>
@@ -175,7 +199,11 @@ export const FacultyDashboardPage: React.FC<FacultyDashboardPageProps> = ({
               </div>
             )}
 
-            {currentPage !== 'dashboard' && (
+            {currentPage === 'audit' && (
+              <AuditQueuePanel />
+            )}
+
+            {currentPage !== 'dashboard' && currentPage !== 'audit' && (
               <div className="text-center py-12">
                 <p className="text-slate-600 text-lg mb-4">
                   Navigate using the sidebar to view this section
