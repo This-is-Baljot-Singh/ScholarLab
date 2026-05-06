@@ -22,7 +22,7 @@ from app.security.rbac import RBACEnforcer
 from app.metrics.prometheus_metrics import MetricsMiddleware
 
 # Import all routers
-from app.routers import auth, geofences, attendance, student, websockets, analytics, ws as ws_router, curriculum as curriculum_router, metrics as metrics_router
+from app.routers import auth, geofences, attendance, student, websockets, analytics, ws as ws_router, curriculum as curriculum_router, metrics as metrics_router, students as students_router
 # from app.routers.attendance_verification import router as attendance_verification_router
 
 # Initialize structured logging
@@ -114,6 +114,7 @@ app.include_router(analytics.router, prefix="/api/analytics")
 app.include_router(websockets.router, prefix="/api/ws")  # Student WebSocket
 app.include_router(ws_router.router, prefix="/ws")       # Faculty WebSocket
 app.include_router(curriculum_router.router, prefix="/api/curriculum")
+app.include_router(students_router.router, prefix="/api/students")
 
 # Production monitoring
 app.include_router(metrics_router.router, prefix="", tags=["monitoring"])

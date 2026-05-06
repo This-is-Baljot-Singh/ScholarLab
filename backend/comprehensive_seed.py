@@ -403,6 +403,108 @@ async def seed_attendance_logs(db):
     return attendance_count
 
 
+async def seed_sessions(db):
+    """Seed active and completed lecture sessions."""
+    sessions_collection = db["sessions"]
+    geofences_collection = db["geofences"]
+    users_collection = db["users"]
+    curriculum_collection = db["curriculum"]
+
+    logger.info("Seeding lecture sessions...")
+    
+    geofences = await geofences_collection.find({}).to_list(10)
+    faculty = await users_collection.find({"role": "faculty"}).to_list(1)
+    nodes = await curriculum_collection.find({"course_id": "CS101"}).to_list(5)
+
+    if not geofences or not faculty or not nodes:
+        logger.warning("  ! Missing required data for sessions. Skipping.")
+        return 0
+
+    sessions = [
+        {
+            "id": "session-live-101",
+            "lectureId": "CS101-L1",
+            "currentCurriculumNodeId": str(nodes[0]["_id"]),
+            "geofenceId": str(geofences[0]["_id"]),
+            "facultyId": str(faculty[0]["_id"]),
+            "startTime": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+            "status": "active",
+            "attendanceCount": 15
+        },
+        {
+            "id": "session-completed-99",
+            "lectureId": "CS101-L0",
+            "currentCurriculumNodeId": str(nodes[1]["_id"]),
+            "geofenceId": str(geofences[1]["_id"]),
+            "facultyId": str(faculty[0]["_id"]),
+            "startTime": (datetime.now(timezone.utc) - timedelta(days=1, hours=2)).isoformat(),
+            "endTime": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            "status": "completed",
+            "attendanceCount": 42
+        }
+    ]
+
+    count = 0
+    for s in sessions:
+        existing = await sessions_collection.find_one({"id": s["id"]})
+        if not existing:
+            await sessions_collection.insert_one(s)
+            count += 1
+            logger.info(f"  ✓ Created session: {s['lectureId']} ({s['status']})")
+    
+    return count
+
+
+async def seed_curriculum_verification(db):
+    """Seed pending curriculum verification tasks."""
+    tasks_collection = db["curriculum_verification_tasks"]
+    curriculum_collection = db["curriculum"]
+
+    logger.info("Seeding curriculum verification tasks...")
+    
+    nodes = await curriculum_collection.find({"course_id": "CS101"}).to_list(5)
+    if not nodes:
+        logger.warning("  ! No curriculum nodes found. Skipping verification tasks.")
+        return 0
+
+    tasks = [
+        {
+            "task_id": f"task-{random.randint(1000, 9999)}",
+            "session_id": "session-live-101",
+            "course_id": "CS101",
+            "topic": "Recursive Fibonacci optimization",
+            "topic_confidence": 0.42,
+            "original_node_id": str(nodes[0]["_id"]),
+            "original_node_title": nodes[0]["title"],
+            "similarity_score": 0.4821,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "task_id": f"task-{random.randint(1000, 9999)}",
+            "session_id": "session-live-101",
+            "course_id": "CS101",
+            "topic": "B-Tree balancing vs AVL",
+            "topic_confidence": 0.38,
+            "original_node_id": str(nodes[1]["_id"]),
+            "original_node_title": nodes[1]["title"],
+            "similarity_score": 0.3542,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+
+    count = 0
+    for t in tasks:
+        existing = await tasks_collection.find_one({"task_id": t["task_id"]})
+        if not existing:
+            await tasks_collection.insert_one(t)
+            count += 1
+            logger.info(f"  ✓ Created verification task for topic: {t['topic']}")
+    
+    return count
+
+
 async def seed_admin_user(db):
     """Seed an admin user for system management."""
     users_collection = db["users"]
@@ -446,6 +548,8 @@ async def main():
             await db["geofences"].delete_many({})
             await db["curriculum"].delete_many({})
             await db["attendance"].delete_many({})
+            await db["sessions"].delete_many({})
+            await db["curriculum_verification_tasks"].delete_many({})
             logger.info("✓ Collections cleared\n")
         
         # Execute seeding
@@ -456,6 +560,8 @@ async def main():
             "geofences": await seed_geofences(db),
             "curriculum": await seed_curriculum(db),
             "attendance": await seed_attendance_logs(db),
+            "sessions": await seed_sessions(db),
+            "verification": await seed_curriculum_verification(db),
         }
         
         # Display summary
@@ -468,6 +574,8 @@ async def main():
         logger.info(f"✓ Geofences:           {stats['geofences']}")
         logger.info(f"✓ Curriculum Modules:  {stats['curriculum']}")
         logger.info(f"✓ Attendance Logs:     {stats['attendance']}")
+        logger.info(f"✓ Lecture Sessions:    {stats['sessions']}")
+        logger.info(f"✓ Verification Tasks: {stats['verification']}")
         logger.info("=" * 70)
         
         # Display test credentials

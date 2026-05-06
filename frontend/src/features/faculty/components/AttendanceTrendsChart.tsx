@@ -20,13 +20,13 @@ interface TrendData {
 const formatYAxisTick = (value: number): string => value.toString();
 
 /** Tooltip value formatter: "123 Verified Attendances" — no abbreviation */
-const formatTooltipValue = (value: number): [string, string] => [
-  value.toString(),
+const formatTooltipValue = (value: any): [string, string] => [
+  String(value),
   'Verified Attendances',
 ];
 
 /** Tooltip label formatter: full YYYY-MM-DD date */
-const formatTooltipLabel = (date: string): string => `Date: ${date}`;
+const formatTooltipLabel = (date: any): string => `Date: ${String(date)}`;
 
 /** X-axis tick: shortened MM/DD for readability on the axis itself */
 const formatXAxisTick = (date: string): string => {

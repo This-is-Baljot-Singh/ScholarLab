@@ -25,16 +25,38 @@ export const AuditQueuePanel: React.FC = () => {
       const response = await apiClient.post(`/attendance/audit/${id}`, payload);
       return response.data;
     },
+    onMutate: async ({ id }) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['audit-queue'] });
+
+      // Snapshot the previous value
+      const previousQueue = queryClient.getQueryData<AuditQueueRecord[]>(['audit-queue']);
+
+      // Optimistically update to the new value by removing the item
+      queryClient.setQueryData<AuditQueueRecord[]>(['audit-queue'], (old) => 
+        old ? old.filter((item) => item.id !== id) : []
+      );
+
+      // Return a context object with the snapshotted value
+      return { previousQueue };
+    },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['audit-queue'] });
-      toast.success(`Audit record ${variables.payload.approve ? 'approved' : 'rejected'} successfully.`);
+      toast.success(`Attendance record ${variables.payload.approve ? 'approved' : 'rejected'} successfully.`);
       setActiveAction(null);
       setJustification('');
     },
-    onError: (error: any) => {
+    onError: (error: any, __, context) => {
+      // Roll back to the previous value if mutation fails
+      if (context?.previousQueue) {
+        queryClient.setQueryData(['audit-queue'], context.previousQueue);
+      }
       toast.error('Failed to process audit', {
         description: error.response?.data?.detail || error.message || 'An error occurred.',
       });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to keep data in sync
+      queryClient.invalidateQueries({ queryKey: ['audit-queue'] });
     },
   });
 

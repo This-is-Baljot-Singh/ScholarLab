@@ -7,7 +7,7 @@ export const USER_ROLES = {
 export const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
   faculty: 'Faculty',
-  admin: 'Administrator',
+  admin: 'Admin',
 };
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';

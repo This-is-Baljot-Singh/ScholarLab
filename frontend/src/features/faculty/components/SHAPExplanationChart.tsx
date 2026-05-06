@@ -36,8 +36,14 @@ export const SHAPExplanationChart: React.FC<SHAPExplanationChartProps> = ({
   }, [explanations]);
 
   const getBarColor = (rawImpact: number) => {
-    // Red: increases risk (positive), Green: decreases risk (negative)
+    // Red: increases risk (positive SHAP), Green: decreases risk (negative SHAP)
+    // Strict sign check on the precise float — no rounding before comparison
     return rawImpact > 0 ? '#ef4444' : '#10b981';
+  };
+
+  const formatSignedImpact = (rawImpact: number): string => {
+    const sign = rawImpact > 0 ? '+' : '';
+    return `${sign}${rawImpact.toFixed(4)}`;
   };
 
   return (
@@ -101,13 +107,16 @@ export const SHAPExplanationChart: React.FC<SHAPExplanationChartProps> = ({
                     border: '1px solid #e2e8f0',
                     borderRadius: '0.5rem'
                   }}
-                  formatter={(value: any) => {
+                  formatter={(value: any, _name: any, props: any) => {
                     if (typeof value === 'number') {
-                      return [value.toFixed(4), 'Absolute Impact'];
+                      // Re-attach sign from rawImpact so tooltip reflects direction
+                      const signed = props.payload?.rawImpact ?? value;
+                      const sign = signed > 0 ? '+' : '';
+                      return [`${sign}${signed.toFixed(4)}`, 'SHAP Impact'];
                     }
                     return value;
                   }}
-                  labelFormatter={(label) => `${label}`}
+                  labelFormatter={(label) => `Feature: ${label}`}
                 />
                 <Bar dataKey="impact" radius={[0, 8, 8, 0]}>
                   {chartData.map((entry, index) => (
@@ -135,6 +144,11 @@ export const SHAPExplanationChart: React.FC<SHAPExplanationChartProps> = ({
               <div>
                 <p className="font-medium text-slate-800">
                   {item.feature} = {item.value.toFixed(2)}
+                </p>
+                <p className={`text-xs font-mono font-semibold mt-0.5 tabular-nums ${
+                  item.rawImpact > 0 ? 'text-red-600' : 'text-emerald-600'
+                }`}>
+                  SHAP: {formatSignedImpact(item.rawImpact)}
                 </p>
                 <p className="text-xs text-slate-600 mt-1">{item.explanation}</p>
               </div>

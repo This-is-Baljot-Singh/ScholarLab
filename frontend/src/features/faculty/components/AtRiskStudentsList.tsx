@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Loader2, AlertCircle, ServerCrash } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { StudentRiskModal } from './StudentRiskModal';
@@ -24,15 +24,22 @@ export const AtRiskStudentsList: React.FC = () => {
   // (via queryClient.setQueryData), and the query key is invalidated on
   // `attendance_verified` events.
   // A 5-minute background refresh is kept as a safety-net fallback.
-  const { data: students = [], isLoading, isError } = useQuery({
+  const { data: students = [], isLoading, isError, error } = useQuery({
     queryKey: ['at-risk-students'],
     queryFn: async () => {
       const response = await apiClient.get<AtRiskStudent[]>('/analytics/at-risk-students');
       return response.data;
     },
+    retry: 1,
     refetchInterval: 300_000,
     staleTime: 60_000,
   });
+
+  // Determine if failure is a model/inference failure vs generic network error
+  const isModelFailure = isError && (() => {
+    const status = (error as any)?.response?.status;
+    return status === 503 || status === 500;
+  })();
 
   const handleStudentClick = (studentId: string, studentName: string) => {
     setSelectedStudent(studentId);
@@ -72,9 +79,23 @@ export const AtRiskStudentsList: React.FC = () => {
             <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
           </div>
         ) : isError ? (
-          <div className="flex items-center justify-center py-8 gap-2 text-red-600">
-            <AlertCircle className="h-5 w-5" />
-            <p className="text-sm">Failed to load at-risk students</p>
+          <div className="flex flex-col items-center justify-center py-8 gap-3">
+            {isModelFailure ? (
+              <>
+                <ServerCrash className="h-8 w-8 text-red-500" />
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-red-700">Model Inference Failed</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    The XGBoost prediction engine is unavailable. No fallback data is shown.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <p className="text-sm text-red-600">Failed to load at-risk students</p>
+              </>
+            )}
           </div>
         ) : students.length === 0 ? (
           <div className="flex items-center justify-center py-8">
@@ -87,7 +108,7 @@ export const AtRiskStudentsList: React.FC = () => {
               return (
                 <button
                   key={student.id}
-                  onClick={() => handleStudentClick(student.email, student.name)}
+                  onClick={() => handleStudentClick(student.id, student.name)}
                   className={`w-full flex items-center justify-between rounded-lg p-4 border transition-all hover:shadow-md active:scale-95 ${colors.bg} ${colors.border}`}
                 >
                   <div className="flex items-center gap-4 flex-1 text-left">

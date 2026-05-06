@@ -145,7 +145,7 @@ class AttendanceVerifyRequest(BaseModel):
         max_length=256
     )
     device_certificate_fingerprint: str = Field(
-        regex="^[a-f0-9]{64}$",
+        pattern="^[a-f0-9]{64}$",
         description="SHA256 hex fingerprint"
     )
     # Biometric signal
@@ -155,7 +155,7 @@ class AttendanceVerifyRequest(BaseModel):
     # Network environment
     bssid: Optional[str] = Field(
         None,
-        regex="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+        pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
         description="WiFi MAC address (optional)"
     )
 

@@ -93,7 +93,7 @@ export const SessionInitializer: React.FC<SessionInitializerProps> = ({
                             <p className="text-sm font-semibold text-slate-900">{graph.title}</p>
                           </div>
                           <div className="bg-white p-0">
-                            {graph.nodes.map((node) => (
+                            {(graph.nodes || []).map((node) => (
                               <button
                                 key={node.id}
                                 onClick={() => setForm({ ...form, curriculumNodeId: node.id })}

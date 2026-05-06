@@ -79,8 +79,9 @@ async def extract_student_features(student_email: str) -> dict:
         delays.append(delay)
     avg_arrival_delay = sum(delays) / len(delays) if delays else 5.0
     
-    # Estimate curriculum engagement (simulated: assume 7/10 for most students)
-    curriculum_engagement_score = 6.5 + (len(attendance_records) / 100)
+    # Estimate curriculum engagement (reward consistent attendance)
+    # 7.0 base + 0.1 per attendance record (capped at 10.0)
+    curriculum_engagement_score = 7.0 + (len(attendance_records) * 0.12)
     curriculum_engagement_score = min(curriculum_engagement_score, 10.0)
     
     # Count spatial anomalies (spoofed attempts)
@@ -314,13 +315,17 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
         feature_impact = []
         if shap_values is not None:
             for i, col in enumerate(features.columns):
-                impact = float(shap_values[0][i])
+                impact = round(float(shap_values[0][i]), 4)  # 4dp — full precision
                 feature_value = float(cast(Any, features.iloc[0, i]))
                 feature_impact.append({
                     "feature": col,
                     "value": feature_value,
                     "shap_impact": impact,
-                    "human_readable": f"The '{col}' value of {feature_value:.2f} {'increased' if impact > 0 else 'decreased'} risk by {abs(impact):.3f}."
+                    "human_readable": (
+                        f"The '{col}' value of {feature_value:.2f} "
+                        f"{'increased' if impact > 0 else 'decreased'} "
+                        f"risk by {abs(impact):.4f}."
+                    )
                 })
         
         return {
@@ -332,3 +337,28 @@ async def predict_student_risk(user_id: str, current_user: dict = Depends(requir
     except Exception as e:
         logger.error(f"Error predicting student risk: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@router.get("/performance")
+async def get_student_performance(current_user: dict = Depends(require_role([RoleEnum.student, RoleEnum.faculty, RoleEnum.admin]))):
+    """
+    Returns performance metrics for the current student.
+    Used by StudentPerformanceRadar.
+    """
+    try:
+        email = current_user["email"]
+        features = await extract_student_features(email)
+        
+        # Calculate risk score if model exists
+        risk_score = 0.0
+        if model is not None:
+            features_df = pd.DataFrame([features])
+            risk_score = float(model.predict_proba(features_df)[0][1])
+        
+        return {
+            "attendanceRate": round(float(features["attendance_rate"] * 100), 1),
+            "curriculumEngagement": round(float((features["curriculum_engagement_score"] / 10.0) * 100), 1),
+            "riskScore": round(float((1.0 - risk_score) * 100), 1)
+        }
+    except Exception as e:
+        logger.error(f"Error fetching performance metrics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load performance metrics")

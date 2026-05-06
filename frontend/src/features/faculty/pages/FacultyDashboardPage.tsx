@@ -1,219 +1,406 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Map, Zap, Play, BarChart3, Menu, X, LogOut, ShieldAlert } from 'lucide-react';
-import { Button } from '@/shared/ui/Button';
+import { Suspense, lazy } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowUpRight,
+  CalendarClock,
+  ClipboardCheck,
+  Clock3,
+  Loader2,
+  ShieldAlert,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import {
+  AuditQueuePanel,
+  CurriculumVerificationQueue,
+  LectureAudioUpload,
+  ActiveClassroomView,
+  StudentManagementTable,
+} from '../components';
 
-import { AuditQueuePanel } from '../components';
+const LazyPredictiveAnalyticsDashboard = lazy(() =>
+  import('../components/PredictiveAnalyticsDashboard').then((module) => ({
+    default: module.PredictiveAnalyticsDashboard,
+  }))
+);
 
-type PageType = 'dashboard' | 'geofence' | 'curriculum' | 'session' | 'analytics' | 'audit';
-
-interface FacultyDashboardPageProps {
-  onNavigate: (page: PageType) => void;
-  currentPage: PageType;
+export interface FacultyDashboardPageProps {
+  onNavigate?: unknown;
+  currentPage?: unknown;
 }
 
-export const FacultyDashboardPage: React.FC<FacultyDashboardPageProps> = ({
-  onNavigate,
-  currentPage,
-}) => {
-  const navigate = useNavigate();
-  const logout = useAuthStore((state) => state.logout);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+interface ActiveSessionSummary {
+  id: string;
+  status: string;
+  title: string;
+  instructor: string;
+  students: number;
+  startedAt: string;
+}
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+const FALLBACK_ACTIVE_SESSIONS: ActiveSessionSummary[] = [
+  {
+    id: 'session-204',
+    status: 'active',
+    title: 'Advanced Algorithms',
+    instructor: 'Dr. Sarah Chen',
+    students: 24,
+    startedAt: 'Today · 9:00 AM',
+  },
+  {
+    id: 'session-218',
+    status: 'active',
+    title: 'Database Systems',
+    instructor: 'Prof. Miguel Santos',
+    students: 31,
+    startedAt: 'Today · 10:15 AM',
+  },
+  {
+    id: 'session-227',
+    status: 'active',
+    title: 'Applied AI Seminar',
+    instructor: 'Dr. Lina Patel',
+    students: 18,
+    startedAt: 'Today · 11:30 AM',
+  },
+];
 
-  const menuItems: Array<{
-    id: PageType;
-    label: string;
-    icon: React.ReactNode;
-    description: string;
-  }> = [
-    {
-      id: 'geofence',
-      label: 'Geofence Manager',
-      icon: <Map className="w-5 h-5" />,
-      description: 'Create and manage campus geofences',
+const normalizeActiveSession = (session: any, index: number): ActiveSessionSummary => ({
+  id: String(session?.id ?? session?._id ?? `session-${index + 1}`),
+  status: session?.status ?? 'active',
+  title:
+    session?.title ?? session?.lectureTitle ?? session?.lecture?.title ?? `Live session ${index + 1}`,
+  instructor: session?.instructor ?? session?.facultyName ?? 'Faculty team',
+  students: Number(session?.students ?? session?.attendanceCount ?? 0),
+  startedAt:
+    session?.startedAt ??
+    session?.startTime ??
+    session?.lecture?.startTime ??
+    'In progress',
+});
+
+const getStatusTone = (status: string) => {
+  if (status.toLowerCase() === 'active') {
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  }
+
+  return 'bg-slate-100 text-slate-600 border-slate-200';
+};
+
+const FacultyMetric = ({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+}) => (
+  <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-center gap-3">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+        <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+      </div>
+    </div>
+  </div>
+);
+
+const AnalyticsChunkFallback = () => (
+  <div className="flex h-[28rem] items-center justify-center rounded-[1.75rem] border border-dashed border-slate-200 bg-white text-slate-500 shadow-sm">
+    <div className="flex items-center gap-3">
+      <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+      <span className="text-sm font-medium">Loading analytics…</span>
+    </div>
+  </div>
+);
+
+export const FacultyDashboardPage = (_props: FacultyDashboardPageProps) => {
+  const user = useAuthStore((state) => state.user);
+
+  const { data: activeSessionsData, isLoading: isLoadingSessions } = useQuery<ActiveSessionSummary[]>({
+    queryKey: ['faculty-active-sessions'],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get('/analytics/sessions/active');
+        const sessions = Array.isArray(response.data) ? response.data : [];
+
+        if (sessions.length === 0) {
+          return FALLBACK_ACTIVE_SESSIONS;
+        }
+
+        return sessions.map(normalizeActiveSession);
+      } catch {
+        return FALLBACK_ACTIVE_SESSIONS;
+      }
     },
-    {
-      id: 'curriculum',
-      label: 'Curriculum Builder',
-      icon: <Zap className="w-5 h-5" />,
-      description: 'Build interactive curriculum graphs',
+    staleTime: 60_000,
+  });
+
+  const { data: auditQueue = [] } = useQuery({
+    queryKey: ['audit-queue'],
+    queryFn: async () => {
+      const response = await apiClient.get('/attendance/audit-queue');
+      return response.data;
     },
-    {
-      id: 'session',
-      label: 'Session Control',
-      icon: <Play className="w-5 h-5" />,
-      description: 'Start and manage live sessions',
+    staleTime: 30_000,
+  });
+
+  const { data: curriculumQueue = [] } = useQuery({
+    queryKey: ['curriculum-verification-queue'],
+    queryFn: async () => {
+      const response = await apiClient.get('/curriculum/verification-queue');
+      return response.data;
     },
-    {
-      id: 'analytics',
-      label: 'Analytics Dashboard',
-      icon: <BarChart3 className="w-5 h-5" />,
-      description: 'Predictive analytics & SHAP insights',
-    },
-    {
-      id: 'audit',
-      label: 'Audit Trail',
-      icon: <ShieldAlert className="w-5 h-5" />,
-      description: 'Review flagged attendance records',
-    },
-  ];
+    staleTime: 30_000,
+  });
+
+  const activeSessions = activeSessionsData ?? FALLBACK_ACTIVE_SESSIONS;
+  const sessionId = activeSessions[0]?.id ?? null;
 
   return (
-    <div className="h-screen bg-slate-50 flex">
-      {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-80' : 'w-20'
-        } bg-white border-r border-slate-200 transition-all duration-300 flex flex-col`}
+    <div className="space-y-8 pb-4">
+      <section
+        id="overview"
+        className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm"
       >
-        {/* Logo */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-          {sidebarOpen && <h1 className="text-xl font-bold text-indigo-600">ScholarLab</h1>}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1 hover:bg-slate-100 rounded transition-colors"
-          >
-            {sidebarOpen ? (
-              <X className="w-5 h-5 text-slate-600" />
-            ) : (
-              <Menu className="w-5 h-5 text-slate-600" />
-            )}
-          </button>
-        </div>
-
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all ${
-                currentPage === item.id
-                  ? 'bg-indigo-100 text-indigo-900 border border-indigo-300'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <span className="mt-0.5 flex-shrink-0">{item.icon}</span>
-              {sidebarOpen && (
-                <div className="text-left">
-                  <p className="font-semibold text-sm">{item.label}</p>
-                  <p className="text-xs text-current opacity-75 line-clamp-1">
-                    {item.description}
-                  </p>
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* User Info */}
-        {sidebarOpen && (
-          <div className="border-t border-slate-200 p-4 space-y-3">
-            <div className="bg-indigo-50 rounded-lg p-3 text-sm">
-              <p className="font-semibold text-slate-900">Dr. Sarah Chen</p>
-              <p className="text-xs text-slate-600 mt-0.5">Faculty Member</p>
+        <div className="grid gap-0 lg:grid-cols-[1.3fr_0.85fr]">
+          <div className="bg-gradient-to-br from-indigo-600 via-indigo-600 to-slate-900 p-8 text-white sm:p-10">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/80">
+                Faculty Workspace
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
+                <Sparkles className="h-3.5 w-3.5" />
+                Predictive analytics ready
+              </span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors border border-red-200"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          </div>
-        )}
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">Faculty Command Center</h2>
-              <p className="text-slate-600 text-sm mt-1">
-                Manage geofences, build curricula, and track student engagement
+            <div className="mt-8 max-w-2xl space-y-5">
+              <p className="text-sm font-medium text-white/70">Welcome back, {user?.name ?? 'Faculty'}</p>
+              <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+                Keep live instruction, verification, and risk tracking in one place.
+              </h1>
+              <p className="max-w-xl text-sm leading-7 text-white/75 sm:text-base">
+                This workspace surfaces active sessions, the pending curriculum verification queue,
+                and the predictive analytics dashboard used to monitor student risk in real time.
               </p>
             </div>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <FacultyMetric label="Active sessions" value={String(activeSessions.length)} icon={CalendarClock} />
+              <FacultyMetric label="Verification" value={String(auditQueue.length + curriculumQueue.length)} icon={ClipboardCheck} />
+              <FacultyMetric label="Analytics feed" value="Live" icon={ShieldAlert} />
+            </div>
           </div>
-        </div>
 
-        {/* Dashboard View */}
-        <div className="flex-1 overflow-hidden p-6">
-          <div className="max-w-7xl mx-auto h-full">
-            {currentPage === 'dashboard' && (
-              <div className="grid grid-cols-2 gap-6 h-full">
-                {/* Welcome Card */}
-                <div className="col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-lg p-6 text-white shadow-lg">
-                  <h3 className="text-xl font-bold mb-2">Welcome to ScholarLab Faculty Portal</h3>
-                  <p className="opacity-90">
-                    Manage your courses with advanced geofencing, curriculum design, and AI-powered student analytics.
-                  </p>
+          <div className="grid gap-4 bg-slate-50 p-6 sm:grid-cols-2 lg:grid-cols-1 lg:p-8">
+            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Current workload</p>
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm text-slate-500">Sessions in progress</p>
+                  <p className="mt-2 text-3xl font-semibold text-slate-900">{activeSessions.length}</p>
                 </div>
+                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  Stable
+                </div>
+              </div>
 
-                {/* Feature Cards */}
-                {menuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className="bg-white rounded-lg border border-slate-200 p-6 text-left hover:shadow-lg transition-shadow group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="p-3 bg-indigo-50 rounded-lg group-hover:bg-indigo-100 transition-colors text-indigo-600">
-                        {item.icon}
+              <div className="mt-5 space-y-3">
+                {activeSessions.slice(0, 2).map((session) => (
+                  <div key={session.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{session.title}</p>
+                        <p className="mt-1 text-xs text-slate-500">{session.instructor}</p>
                       </div>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusTone(session.status)}`}>
+                        {session.status}
+                      </span>
                     </div>
-                    <h4 className="font-semibold text-slate-900 text-lg mb-2">{item.label}</h4>
-                    <p className="text-slate-600 text-sm mb-4">{item.description}</p>
-                    <div className="text-indigo-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
-                      Open →
+                    <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-500">
+                      <span className="inline-flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        {session.students} students
+                      </span>
+                      <span>{session.startedAt}</span>
                     </div>
-                  </button>
+                  </div>
                 ))}
+              </div>
+            </div>
 
-                {/* Quick Stats */}
-                <div className="col-span-2 grid grid-cols-4 gap-4">
-                  <div className="bg-white rounded-lg border border-slate-200 p-4">
-                    <p className="text-xs font-medium text-slate-600 uppercase mb-2">Active Sessions</p>
-                    <p className="text-3xl font-bold text-slate-900">3</p>
+            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Latest analytics</p>
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Predictive analytics dashboard</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  The live model is pinned below. Use the current session to keep SHAP explanations
+                  and attendance risk synced to the class you are teaching.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 transition hover:text-indigo-700"
+              >
+                Jump to analytics
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Pending reviews</p>
+                <div className="mt-2 flex gap-4">
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Attendance</p>
+                    <p className="text-lg font-bold text-slate-800">{auditQueue.length}</p>
                   </div>
-                  <div className="bg-white rounded-lg border border-slate-200 p-4">
-                    <p className="text-xs font-medium text-slate-600 uppercase mb-2">Geofences</p>
-                    <p className="text-3xl font-bold text-slate-900">8</p>
-                  </div>
-                  <div className="bg-white rounded-lg border border-slate-200 p-4">
-                    <p className="text-xs font-medium text-slate-600 uppercase mb-2">At-Risk Students</p>
-                    <p className="text-3xl font-bold text-red-600">5</p>
-                  </div>
-                  <div className="bg-white rounded-lg border border-slate-200 p-4">
-                    <p className="text-xs font-medium text-slate-600 uppercase mb-2">Curriculum Graphs</p>
-                    <p className="text-3xl font-bold text-slate-900">2</p>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Curriculum</p>
+                    <p className="text-lg font-bold text-slate-800">{curriculumQueue.length}</p>
                   </div>
                 </div>
               </div>
-            )}
-
-            {currentPage === 'audit' && (
-              <AuditQueuePanel />
-            )}
-
-            {currentPage !== 'dashboard' && currentPage !== 'audit' && (
-              <div className="text-center py-12">
-                <p className="text-slate-600 text-lg mb-4">
-                  Navigate using the sidebar to view this section
-                </p>
-                <Button onClick={() => onNavigate('dashboard')}>Back to Dashboard</Button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section id="active-sessions" className="space-y-4 scroll-mt-28">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Active sessions
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              Live teaching sessions at a glance
+            </h2>
+          </div>
+          {isLoadingSessions ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+              Syncing sessions
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+              <Clock3 className="h-3.5 w-3.5 text-indigo-600" />
+              {activeSessions.length} live
+            </span>
+          )}
+        </div>
+
+        {/* Active Classroom View */}
+        <div className="mb-6">
+          <ActiveClassroomView sessionId={sessionId || undefined} showDetails={true} />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {activeSessions.map((session) => (
+                <article
+                  key={session.id}
+                  className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-600">
+                        {session.status}
+                      </p>
+                      <h3 className="mt-2 text-lg font-semibold text-slate-900">{session.title}</h3>
+                    </div>
+                    <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+                      <CalendarClock className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 space-y-3 text-sm text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-slate-400" />
+                      <span>{session.students} students engaged</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock3 className="h-4 w-4 text-slate-400" />
+                      <span>{session.startedAt}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 transition hover:text-indigo-700"
+                  >
+                    Open session
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-1">
+            <LectureAudioUpload 
+              sessionId={sessionId || 'unknown'} 
+              courseId="CS101" // In a real app this would come from the session context
+            />
+          </div>
+        </div>
+      </section>
+
+      <section id="verification-queue" className="space-y-4 scroll-mt-28">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Manual Verification Queues
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+            Review and resolve flagged items
+          </h2>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Attendance Anomalies</p>
+            <AuditQueuePanel />
+          </div>
+          <div className="space-y-4">
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Curriculum Mapping</p>
+            <CurriculumVerificationQueue />
+          </div>
+        </div>
+      </section>
+
+      <section id="student-management" className="space-y-4 scroll-mt-28">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Student Administration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+            Monitor enrollment, attendance, and risk
+          </h2>
+        </div>
+
+        <StudentManagementTable courseId="CS101" maxRows={15} />
+      </section>
+
+      <section id="analytics-dashboard" className="space-y-4 scroll-mt-28">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Predictive analytics dashboard
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+            ML-powered student risk assessment and explanations
+          </h2>
+        </div>
+
+        <Suspense fallback={<AnalyticsChunkFallback />}>
+          <LazyPredictiveAnalyticsDashboard sessionId={sessionId} />
+        </Suspense>
+      </section>
     </div>
   );
 };

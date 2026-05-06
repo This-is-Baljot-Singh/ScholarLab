@@ -35,6 +35,7 @@ users_collection = db.get_collection("users")
 geofences_collection = db.get_collection("geofences")
 curriculum_collection = db.get_collection("curriculum")
 attendance_collection = db.get_collection("attendance")
+sessions_collection = db.get_collection("sessions")
 
 
 async def get_db():

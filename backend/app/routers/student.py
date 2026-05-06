@@ -18,9 +18,19 @@ async def get_student_dashboard(current_user: dict = Depends(require_role([RoleE
     Will be populated with live MongoDB data in Sprint 3.
     """
     return {
-        "activeSession": None, # Set to None for now. The UI handles this gracefully.
+        "activeSession": {
+            "attendanceMarked": False,
+            "lecture": {
+                "id": "session_67890",
+                "title": "Data Structures Lab",
+                "startTime": datetime.now(timezone.utc).isoformat(),
+                "location": "Engineering Hall 204",
+                "classCode": "CS204"
+            }
+        },
         "unlockedCurriculum": [],
-        "recentAttendance": []
+        "recentAttendance": [],
+        "riskScore": 8
     }
 
 

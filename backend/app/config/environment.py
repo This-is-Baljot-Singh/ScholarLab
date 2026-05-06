@@ -9,6 +9,7 @@ from enum import Enum
 from pydantic_settings import BaseSettings
 from typing import Optional
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -101,11 +102,21 @@ class FeatureFlags(BaseSettings):
     enable_seed_data_endpoints: bool = False
 
 
+class MinIOConfig(BaseSettings):
+    """On-premises MinIO S3-compatible object store configuration."""
+    endpoint: str = "http://localhost:9000"
+    access_key: str = "minioadmin"
+    secret_key: str = "minioadmin"
+    bucket_name: str = "scholarlab-audio"
+    # Derived: boto3 requires path-style access for MinIO
+    use_path_style: bool = True
+
+
 class ScholarLabSettings(BaseSettings):
     """Unified configuration for all environments."""
-    
+
     environment: EnvironmentEnum = EnvironmentEnum.dev
-    
+
     # Core configs
     mongodb: MongoDBConfig
     auth: AuthConfig
@@ -113,7 +124,8 @@ class ScholarLabSettings(BaseSettings):
     audit: AuditConfig
     job_queue: JobQueueConfig
     features: FeatureFlags
-    
+    minio: MinIOConfig = MinIOConfig()
+
     class Config:
         env_file = ".env"
         env_nested_delimiter = "__"  # Support MONGODB__URL=... in .env
@@ -216,10 +228,17 @@ def get_settings_for_env(env: EnvironmentEnum) -> ScholarLabSettings:
         )
     
     elif env == EnvironmentEnum.staging:
+        _mongo_url = os.environ.get("MONGODB_URL")
+        if not _mongo_url:
+            logger.warning(
+                "MONGODB_URL not set; staging defaulting to unauthenticated "
+                "localhost URI. Set MONGODB_URL for authenticated access."
+            )
+            _mongo_url = "mongodb://localhost:27017"
         return ScholarLabSettings(
             environment=EnvironmentEnum.staging,
             mongodb=MongoDBConfig(
-                url="mongodb://localhost:27017",
+                url=_mongo_url,
                 database="scholarlab_staging",
                 auto_create_indexes=True,
                 enforce_schemas=False,
@@ -260,10 +279,17 @@ def get_settings_for_env(env: EnvironmentEnum) -> ScholarLabSettings:
         )
     
     else:  # dev
+        _mongo_url = os.environ.get("MONGODB_URL")
+        if not _mongo_url:
+            logger.warning(
+                "MONGODB_URL not set; dev defaulting to unauthenticated "
+                "localhost URI. Set MONGODB_URL for authenticated access."
+            )
+            _mongo_url = "mongodb://localhost:27017"
         return ScholarLabSettings(
             environment=EnvironmentEnum.dev,
             mongodb=MongoDBConfig(
-                url="mongodb://localhost:27017",
+                url=_mongo_url,
                 database="scholarlab_dev",
                 auto_create_indexes=True,
                 enforce_schemas=False,

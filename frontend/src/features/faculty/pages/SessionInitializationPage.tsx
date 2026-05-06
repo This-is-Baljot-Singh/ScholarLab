@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/shared/ui/Button';
 import { SessionInitializer } from '../components';
 import { SessionCloseModal } from '../components';
+import { apiClient } from '@/lib/api';
 import { toast } from 'sonner';
 import type {
   LiveSession,
@@ -18,95 +20,35 @@ interface SessionInitializationPageProps {
 export const SessionInitializationPage: React.FC<SessionInitializationPageProps> = ({
   onBack,
 }) => {
-  // ── Active sessions ──────────────────────────────────────────────────────
-  const [activeSessions, setActiveSessions] = useState<LiveSession[]>([
-    {
-      id: 'session-1',
-      lectureId: 'lecture-morning',
-      currentCurriculumNodeId: 'node-1',
-      geofenceId: 'geofence-1',
-      facultyId: 'faculty-1',
-      startTime: new Date().toISOString(),
-      status: 'active',
-      attendanceCount: 24,
-    },
-  ]);
+  const queryClient = useQueryClient();
 
-  // ── Curriculum graphs (mock; replace with useQuery once backend is wired) ─
-  const [graphs] = useState<CurriculumGraph[]>([
-    {
-      id: 'graph-1',
-      title: 'Data Structures Course',
-      description: 'Complete data structures curriculum',
-      nodes: [
-        {
-          id: 'node-1',
-          title: 'Arrays & Lists',
-          description: 'Introduction to arrays and linked lists',
-          difficulty: 'beginner',
-          estimatedHours: 2,
-          resources: [
-            {
-              id: 'res-1',
-              title: 'Lecture Slides',
-              type: 'pdf',
-              uri: 'https://example.com/slides.pdf',
-              createdAt: new Date().toISOString(),
-            },
-          ],
-          prerequisites: [],
-        },
-        {
-          id: 'node-2',
-          title: 'Binary Trees',
-          description: 'Tree structures and traversals',
-          difficulty: 'intermediate',
-          estimatedHours: 3,
-          resources: [],
-          prerequisites: ['node-1'],
-        },
-        {
-          id: 'node-3',
-          title: 'Advanced Tree Algorithms',
-          description: 'AVL and Red-Black trees',
-          difficulty: 'advanced',
-          estimatedHours: 4,
-          resources: [],
-          prerequisites: ['node-2'],
-        },
-      ],
-      edges: [
-        { source: 'node-1', target: 'node-2' },
-        { source: 'node-2', target: 'node-3' },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // ── Active sessions ──────────────────────────────────────────────────────
+  const { data: activeSessions = [], isLoading: sessionsLoading } = useQuery({
+    queryKey: ['active-sessions'],
+    queryFn: async () => {
+      const response = await apiClient.get<LiveSession[]>('/curriculum/sessions/active');
+      return response.data;
     },
-  ]);
+    refetchInterval: 10_000,
+  });
+
+  // ── Curriculum graphs ────────────────────────────────────────────────────
+  const { data: graphs = [], isLoading: graphsLoading } = useQuery({
+    queryKey: ['curriculum-graphs'],
+    queryFn: async () => {
+      const response = await apiClient.get<CurriculumGraph[]>('/curriculum/graphs');
+      return response.data;
+    },
+  });
 
   // ── Geofences ────────────────────────────────────────────────────────────
-  const [geofences] = useState<GeofenceWithMetadata[]>([
-    {
-      type: 'circle',
-      center: { latitude: 40.1105, longitude: -88.2073 },
-      radiusMeters: 150,
-      id: 'geofence-1',
-      name: 'Engineering Hall',
-      buildingCode: 'ENG-101',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  const { data: geofences = [], isLoading: geofencesLoading } = useQuery({
+    queryKey: ['geofences'],
+    queryFn: async () => {
+      const response = await apiClient.get<GeofenceWithMetadata[]>('/geofences');
+      return response.data;
     },
-    {
-      type: 'circle',
-      center: { latitude: 40.112, longitude: -88.21 },
-      radiusMeters: 200,
-      id: 'geofence-2',
-      name: 'Science Building',
-      buildingCode: 'SCI-200',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ]);
+  });
 
   // ── Session-Close Modal state ─────────────────────────────────────────────
   /**
@@ -121,19 +63,24 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
+  const startSessionMutation = useMutation({
+    mutationFn: async (payload: SessionInitPayload) => {
+      const response = await apiClient.post('/curriculum/sessions', payload);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['active-sessions'] });
+      toast.success(`Session started! Lecture ID: ${data.lectureId}`);
+    },
+    onError: (error: any) => {
+      toast.error('Failed to start session', {
+        description: error.response?.data?.detail || error.message,
+      });
+    },
+  });
+
   const handleStartSession = (payload: SessionInitPayload) => {
-    const newSession: LiveSession = {
-      id: `session-${Date.now()}`,
-      lectureId: payload.lectureId,
-      currentCurriculumNodeId: payload.curriculumNodeId,
-      geofenceId: payload.geofenceId,
-      facultyId: 'faculty-1',
-      startTime: new Date().toISOString(),
-      status: 'active',
-      attendanceCount: 0,
-    };
-    setActiveSessions((prev) => [...prev, newSession]);
-    toast.success(`Session started! Lecture ID: ${payload.lectureId}`);
+    startSessionMutation.mutate(payload);
   };
 
   /**
@@ -152,9 +99,7 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
   const handleCloseConfirm = () => {
     if (!sessionPendingClose) return;
     const attendanceCount = sessionPendingClose.attendanceCount;
-    setActiveSessions((prev) =>
-      prev.filter((s) => s.id !== sessionPendingClose.id),
-    );
+    queryClient.invalidateQueries({ queryKey: ['active-sessions'] });
     toast.success(
       `Session closed. Final attendance: ${attendanceCount} student${
         attendanceCount !== 1 ? 's' : ''
@@ -176,6 +121,17 @@ export const SessionInitializationPage: React.FC<SessionInitializationPageProps>
     : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (sessionsLoading || graphsLoading || geofencesLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <p className="text-slate-600 font-medium">Loading session infrastructure...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-slate-50">

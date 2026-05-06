@@ -34,16 +34,24 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def get_ws_user(token: str = Query(...)):
+async def get_ws_user(token: str):
     """Authenticate WebSocket connections via query parameter."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if not email:
+            logger.warning("WS Handshake: sub (email) missing in token")
             return None
         user = await users_collection.find_one({"email": email})
-        return str(user["_id"]) if user else None
-    except JWTError:
+        if not user:
+            logger.warning(f"WS Handshake: User not found for email: {email}")
+            return None
+        return str(user["_id"])
+    except JWTError as e:
+        logger.warning(f"WS Handshake: JWT decode failed: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"WS Handshake: Unexpected error: {str(e)}")
         return None
 
 @router.websocket("/student")

@@ -350,20 +350,24 @@ def curriculum_pipeline(
     self,
     session_id: str,
     course_id: str,
-    audio_file_path: str,
+    minio_object_key: str,
+    minio_bucket: str = "scholarlab-audio",
     **context
 ) -> Dict[str, Any]:
     """
-    Full curriculum pipeline: Transcription → Topic Extraction → Syllabus Matching.
-    
-    PRIVACY: NO cloud APIs. All processing local.
-    
+    Full curriculum pipeline: MinIO audio → BytesIO → Transcription → Topic
+    Extraction → Syllabus Matching.
+
+    PRIVACY: NO cloud APIs. NO disk writes. All audio processing is local.
+
     Args:
         session_id: Classroom session ID
         course_id: Course ID
-        audio_file_path: Local path to audio recording
+        minio_object_key: Object key in the campus MinIO bucket (returned by
+                          POST /api/curriculum/audio/upload)
+        minio_bucket: MinIO bucket name (default: scholarlab-audio)
         context: {actor_id, request_id}
-    
+
     Returns:
         {
             "session_id": str,
@@ -375,29 +379,52 @@ def curriculum_pipeline(
         }
     """
     try:
+        import io
         from app.ml.local_whisper import LocalWhisperService
         from app.ml.topic_extraction import TopicExtractionService
         from app.services.syllabus_matcher import SyllabusMatchingAgent
         from app.services.verification_agent import VerificationAgent
         from app.ml.embeddings import LocalEmbeddingsService
-        from motor.motor_asyncio import AsyncIOMotorClient
-        
+        from app.utils.minio_client import get_minio_client
+
         logger.info(f"Starting curriculum pipeline for {session_id}")
-        
+
         # Connect to database
         from app.database import db
-        
-        # ===== Stage 1: Transcription =====
+
+        # ===== Stage 0: Stream audio from MinIO into memory =====
+        logger.info(f"[0/4] Fetching audio from MinIO key={minio_object_key}...")
+        s3 = get_minio_client()
+        audio_buffer = io.BytesIO()
+        s3.download_fileobj(minio_bucket, minio_object_key, audio_buffer)
+        audio_buffer.seek(0)  # Rewind for reading
+        logger.info(
+            f"✓ Audio loaded into memory buffer "
+            f"({audio_buffer.getbuffer().nbytes} bytes)"
+        )
+
+        # ===== Stage 1: Transcription (in-memory, no disk) =====
         logger.info(f"[1/4] Transcribing audio...")
         whisper_svc = LocalWhisperService()
         transcript_result = await whisper_svc.transcribe_audio(
-            audio_file_path=audio_file_path,
+            audio_buffer=audio_buffer,  # Pass BytesIO directly
             session_id=session_id,
             language="en",
         )
         transcript_text = transcript_result.transcript
         logger.info(f"✓ Transcription: {len(transcript_text)} chars")
-        
+
+        # ===== Ephemeral cleanup: delete audio from MinIO immediately =====
+        try:
+            s3.delete_object(Bucket=minio_bucket, Key=minio_object_key)
+            logger.info(f"✓ Ephemeral audio deleted from MinIO: key={minio_object_key}")
+        except Exception as del_exc:  # noqa: BLE001
+            # Non-fatal — log and continue; audio will expire naturally if
+            # a MinIO lifecycle policy is configured
+            logger.warning(
+                f"Could not delete MinIO object {minio_object_key}: {del_exc}"
+            )
+
         # ===== Stage 2: Topic Extraction =====
         logger.info(f"[2/4] Extracting topics...")
         topic_svc = TopicExtractionService()
@@ -407,7 +434,7 @@ def curriculum_pipeline(
             top_k=15,
         )
         logger.info(f"✓ Topics extracted: {len(extraction_result.candidates)}")
-        
+
         # ===== Stage 3: Syllabus Matching (Embeddings) =====
         logger.info(f"[3/4] Matching topics to curriculum...")
         embeddings_svc = LocalEmbeddingsService()
@@ -417,7 +444,7 @@ def curriculum_pipeline(
             confidence_threshold=0.6,  # δ
         )
         await matcher.initialize()
-        
+
         mapping_result = await matcher.match_topics_to_nodes(
             session_id=session_id,
             course_id=course_id,
@@ -425,14 +452,14 @@ def curriculum_pipeline(
             top_k_matches=3,
         )
         logger.info(f"✓ Mappings: {mapping_result.total_matches}, Below threshold: {mapping_result.below_threshold_count}")
-        
+
         # ===== Stage 4: Create Verification Tasks =====
         logger.info(f"[4/4] Creating verification tasks...")
         above_threshold, below_threshold = matcher.filter_by_confidence(mapping_result)
-        
+
         verif_agent = VerificationAgent(db)
         await verif_agent.initialize()
-        
+
         if below_threshold:
             verif_tasks = await verif_agent.create_verification_tasks(
                 session_id=session_id,
@@ -442,7 +469,7 @@ def curriculum_pipeline(
             logger.info(f"✓ Created {len(verif_tasks)} verification tasks")
         else:
             verif_tasks = []
-        
+
         result = {
             "session_id": session_id,
             "course_id": course_id,
@@ -456,10 +483,10 @@ def curriculum_pipeline(
             "inference_time_seconds": transcript_result.inference_time_seconds,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         logger.info(f"✓ Curriculum pipeline completed for {session_id}")
         return result
-        
+
     except Exception as exc:
         logger.error(f"Curriculum pipeline failed: {exc}", exc_info=True)
         raise self.retry(exc=exc)

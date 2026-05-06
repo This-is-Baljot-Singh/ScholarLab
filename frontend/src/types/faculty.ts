@@ -166,3 +166,99 @@ export interface AuditActionPayload {
   approve: boolean;
   justification: string;
 }
+
+// ---------------------------------------------------------------------------
+// Curriculum Verification Types
+// ---------------------------------------------------------------------------
+
+export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'corrected';
+
+export interface VerificationTask {
+  task_id: string;
+  session_id: string;
+  course_id: string;
+  topic: string;
+  topic_confidence: number;
+  original_node_id: string;
+  original_node_title: string;
+  similarity_score: number;
+  status: VerificationStatus;
+  faculty_id?: string;
+  verified_at?: string;
+  notes?: string;
+  corrected_node_id?: string;
+  corrected_node_title?: string;
+}
+
+export interface VerifyActionPayload {
+  action: 'approve' | 'reject' | 'correct';
+  notes?: string;
+  corrected_node_id?: string;
+  corrected_node_title?: string;
+}
+
+export interface CurriculumAudioResponse {
+  message: string;
+  task_id: string;
+  object_key: string;
+  privacy_mode: string;
+}
+
+// ---------------------------------------------------------------------------
+// Active Classroom Types
+// ---------------------------------------------------------------------------
+
+export interface ActiveClassroom {
+  sessionId: string;
+  courseId: string;
+  courseTitle: string;
+  instructorName: string;
+  startTime: string;
+  location: string;
+  totalEnrolled: number;
+  successfulCheckIns: number;
+  flaggedForReview: number;
+}
+
+export interface ClassroomCheckInStats {
+  sessionId: string;
+  totalStudents: number;
+  checkedIn: number;
+  flagged: number;
+  percentage: number;
+}
+
+// ---------------------------------------------------------------------------
+// Student Management Types
+// ---------------------------------------------------------------------------
+
+export interface EnrolledStudent {
+  id: string;
+  name: string;
+  email: string;
+  studentId: string;
+  enrolledCourses: string[];
+  attendanceRate: number; // 0-100%
+  riskLevel: 'green' | 'yellow' | 'red';
+  riskScore: number; // 0-100
+  lastAttendance?: string;
+  recentFlags?: number;
+  avgEngagement: number; // 0-100%
+}
+
+export interface StudentEnrollmentResponse {
+  students: EnrolledStudent[];
+  totalEnrolled: number;
+  courseId: string;
+}
+
+export interface StudentCheckInStatus {
+  studentId: string;
+  name: string;
+  email: string;
+  hasCheckedIn: boolean;
+  checkInTime?: string;
+  flagged: boolean;
+  flagReason?: string;
+  riskScore: number;
+}

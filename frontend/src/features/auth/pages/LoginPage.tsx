@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/api';
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_ROLES } from '@/constants/auth';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/constants/auth';
+import { getRolePath } from '@/shared/roleShell';
 import { toast } from 'sonner';
 
 export const LoginPage = () => {
@@ -44,11 +45,7 @@ export const LoginPage = () => {
       toast.success(`Welcome back, ${user.full_name}!`);
 
       // Dynamic Role-Based Navigation
-      if (user.role === USER_ROLES.FACULTY || user.role === USER_ROLES.ADMIN) {
-        navigate('/faculty');
-      } else {
-        navigate('/');
-      }
+      navigate(getRolePath(user.role), { replace: true });
     } catch (err: any) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Login failed. Please try again.';
       setError(message);
@@ -141,16 +138,29 @@ export const LoginPage = () => {
           </div>
 
           {/* Demo Info */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-slate-700 grid grid-cols-2 gap-4">
-            <div>
-              <p className="font-semibold text-indigo-900 mb-1 border-b border-indigo-200 pb-1">Student</p>
-              <p className="text-xs mt-1">student@example.com</p>
-              <p className="text-xs text-slate-500">pw: password</p>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-5 text-sm text-slate-700 space-y-4">
+            <div className="flex justify-between items-center border-b border-indigo-100 pb-2">
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-tight">Admin</p>
+                <p className="text-xs font-mono text-slate-600">admin@scholarlab.edu</p>
+              </div>
+              <p className="text-xs font-semibold bg-white px-2 py-1 rounded border border-indigo-100">Student123!</p>
             </div>
-            <div>
-              <p className="font-semibold text-indigo-900 mb-1 border-b border-indigo-200 pb-1">Faculty</p>
-              <p className="text-xs mt-1">faculty@example.com</p>
-              <p className="text-xs text-slate-500">pw: password</p>
+            
+            <div className="flex justify-between items-center border-b border-indigo-100 pb-2">
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-tight">Faculty</p>
+                <p className="text-xs font-mono text-slate-600">prof.sharma@scholarlab.edu</p>
+              </div>
+              <p className="text-xs font-semibold bg-white px-2 py-1 rounded border border-indigo-100">Student123!</p>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-tight">Student</p>
+                <p className="text-xs font-mono text-slate-600">star.student@scholarlab.edu</p>
+              </div>
+              <p className="text-xs font-semibold bg-white px-2 py-1 rounded border border-indigo-100">Student123!</p>
             </div>
           </div>
         </div>

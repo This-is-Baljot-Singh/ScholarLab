@@ -29,16 +29,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URL=mongodb://admin:admin@mongodb:27017
+      - MONGODB_URL=mongodb://admin:admin@mongodb:27017/scholarlab?authSource=admin
       - SECRET_KEY=${SECRET_KEY:-your_production_secret_key_change_this}
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=15
       - REFRESH_TOKEN_EXPIRE_DAYS=7
       - LOG_LEVEL=INFO
       - REDIS_URL=redis://redis:6379/0
+      # MinIO on-premises object store (campus trust boundary — never public cloud)
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=scholarlab-audio
     depends_on:
       - mongodb
       - redis
+      - minio
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
@@ -56,6 +62,29 @@ services:
       - "80:80"
     depends_on:
       - backend
+
+  # ========================================================================
+  # ON-PREMISES OBJECT STORE (Audio — campus trust boundary)
+  # ========================================================================
+
+  minio:
+    image: minio/minio:latest
+    container_name: scholarlab_minio
+    restart: always
+    ports:
+      - "9000:9000"   # S3-compatible API
+      - "9001:9001"   # MinIO web console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ========================================================================
   # PRODUCTION MONITORING (Phase 4)
@@ -116,5 +145,6 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+  minio_data:
   prometheus_data:
   grafana_data:

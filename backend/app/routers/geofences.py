@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from datetime import datetime, timezone
@@ -50,3 +51,18 @@ async def list_geofences(current_user: dict = Depends(get_current_user)):
     for g in geofences:
         g["_id"] = str(g["_id"])
     return geofences
+
+
+@router.delete("/{geofence_id}")
+async def delete_geofence(geofence_id: str, current_user: dict = Depends(require_role([RoleEnum.faculty, RoleEnum.admin]))):
+    try:
+        object_id = ObjectId(geofence_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid geofence id") from exc
+
+    result = await geofences_collection.delete_one({"_id": object_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Geofence not found")
+
+    return {"message": "Geofence removed", "geofence_id": geofence_id}

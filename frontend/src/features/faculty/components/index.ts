@@ -8,3 +8,7 @@ export { SHAPExplanationChart } from './SHAPExplanationChart';
 export { StudentRiskModal } from './StudentRiskModal';
 export { AtRiskStudentsList } from './AtRiskStudentsList';
 export { AuditQueuePanel } from './AuditQueuePanel';
+export { CurriculumVerificationQueue } from './CurriculumVerificationQueue';
+export { LectureAudioUpload } from './LectureAudioUpload';
+export { ActiveClassroomView } from './ActiveClassroomView';
+export { StudentManagementTable } from './StudentManagementTable';

@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 import { Users, AlertTriangle, ShieldAlert, TrendingUp, Loader2, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { AttendanceTrendsChart } from './AttendanceTrendsChart';
-import { AtRiskStudentsList } from './AtRiskStudentsList';
 import { useFacultyWebSocket } from '@/hooks/useFacultyWebSocket';
 import type { WSConnectionState } from '@/types/websocket';
+
+const AttendanceTrendsChart = lazy(() =>
+  import('./AttendanceTrendsChart').then((module) => ({
+    default: module.AttendanceTrendsChart,
+  }))
+);
+
+const AtRiskStudentsList = lazy(() =>
+  import('./AtRiskStudentsList').then((module) => ({
+    default: module.AtRiskStudentsList,
+  }))
+);
 
 // ---------------------------------------------------------------------------
 // Props
@@ -50,6 +60,18 @@ const WSStatusBadge: React.FC<{ state: WSConnectionState }> = ({ state }) => {
     </div>
   );
 };
+
+const ChartChunkFallback = () => (
+  <div className="flex h-[350px] items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+    <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+  </div>
+);
+
+const RosterChunkFallback = () => (
+  <div className="flex h-[350px] items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+    <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+  </div>
+);
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -155,7 +177,9 @@ export const PredictiveAnalyticsDashboard: React.FC<PredictiveAnalyticsDashboard
       {/* Middle Row: Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Attendance Trends Line Chart */}
-        <AttendanceTrendsChart />
+        <Suspense fallback={<ChartChunkFallback />}>
+          <AttendanceTrendsChart />
+        </Suspense>
 
         {/* Risk Distribution Chart */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -177,7 +201,7 @@ export const PredictiveAnalyticsDashboard: React.FC<PredictiveAnalyticsDashboard
                   ))}
                 </Pie>
                 <RechartsTooltip
-                  formatter={(value: number, name: string) => [value.toString(), name]}
+                  formatter={(value: any, name: any) => [String(value), String(name)]}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -229,7 +253,9 @@ export const PredictiveAnalyticsDashboard: React.FC<PredictiveAnalyticsDashboard
         </div>
 
         {/* At-Risk Students List */}
-        <AtRiskStudentsList />
+        <Suspense fallback={<RosterChunkFallback />}>
+          <AtRiskStudentsList />
+        </Suspense>
       </div>
     </div>
   );
