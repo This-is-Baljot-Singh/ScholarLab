@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 import logging
 import json
+import io
+import asyncio
+from asgiref.sync import async_to_sync
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,21 @@ celery_app = create_celery_app(
     broker_url=settings.job_queue.broker_url,
     result_backend=settings.job_queue.result_backend,
 )
+
+# Dev fallback: run tasks synchronously if Redis is missing
+if settings.environment == "dev":
+    import socket
+    from urllib.parse import urlparse
+    try:
+        url = urlparse(settings.job_queue.broker_url)
+        host = url.hostname or "localhost"
+        port = url.port or 6379
+        with socket.create_connection((host, port), timeout=0.5):
+            logger.info("✓ Redis broker reachable")
+    except (socket.timeout, ConnectionRefusedError, socket.gaierror):
+        logger.warning("⚠ Redis unreachable. Enabling Celery 'task_always_eager' mode.")
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
 
 
 # ============================================================================
@@ -204,7 +222,7 @@ def compute_risk_with_shap(
         
         # Fetch features from database
         # (Implementation: query attendance_events, curriculum_events, etc.)
-        features = await fetch_student_features(user_id, course_id, lookback_days)
+        features = async_to_sync(fetch_student_features)(user_id, course_id, lookback_days)
         
         # Predict
         X = np.array([features])
@@ -406,7 +424,8 @@ def curriculum_pipeline(
         # ===== Stage 1: Transcription (in-memory, no disk) =====
         logger.info(f"[1/4] Transcribing audio...")
         whisper_svc = LocalWhisperService()
-        transcript_result = await whisper_svc.transcribe_audio(
+        # Use asyncio.run to call async method from sync task
+        transcript_result = async_to_sync(whisper_svc.transcribe_audio)(
             audio_buffer=audio_buffer,  # Pass BytesIO directly
             session_id=session_id,
             language="en",
@@ -443,9 +462,9 @@ def curriculum_pipeline(
             embeddings_service=embeddings_svc,
             confidence_threshold=0.6,  # δ
         )
-        await matcher.initialize()
+        async_to_sync(matcher.initialize)()
 
-        mapping_result = await matcher.match_topics_to_nodes(
+        mapping_result = async_to_sync(matcher.match_topics_to_nodes)(
             session_id=session_id,
             course_id=course_id,
             topics=extraction_result.candidates,
@@ -458,10 +477,10 @@ def curriculum_pipeline(
         above_threshold, below_threshold = matcher.filter_by_confidence(mapping_result)
 
         verif_agent = VerificationAgent(db)
-        await verif_agent.initialize()
+        async_to_sync(verif_agent.initialize)()
 
         if below_threshold:
-            verif_tasks = await verif_agent.create_verification_tasks(
+            verif_tasks = async_to_sync(verif_agent.create_verification_tasks)(
                 session_id=session_id,
                 course_id=course_id,
                 below_threshold_matches=below_threshold,
@@ -528,7 +547,7 @@ def unlock_resources_for_session(
         logger.info(f"Unlocking resources for session {session_id}")
         
         unlock_svc = ResourceUnlockService(db)
-        await unlock_svc.initialize()
+        async_to_sync(unlock_svc.initialize)()
         
         # Query attendance decisions with A_t = True for this session
         attendance_col = db["attendance_decisions"]
@@ -537,7 +556,7 @@ def unlock_resources_for_session(
             "attendance_marked": True,  # A_t = True
         })
         
-        attendees = await cursor.to_list(length=1000)
+        attendees = async_to_sync(cursor.to_list)(length=1000)
         
         total_unlocks = 0
         total_resources = 0
@@ -547,7 +566,7 @@ def unlock_resources_for_session(
             decision_id = attendance["decision_id"]
             
             # Unlock resources for this student
-            unlock_result = await unlock_svc.unlock_resources_for_student(
+            unlock_result = async_to_sync(unlock_svc.unlock_resources_for_student)(
                 user_id=user_id,
                 session_id=session_id,
                 course_id=course_id,

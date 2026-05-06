@@ -12,6 +12,7 @@ Pipeline:
 """
 
 import os
+import io
 import subprocess
 import logging
 from typing import Optional, Dict, Any, List
@@ -158,93 +159,97 @@ class LocalWhisperService:
     
     async def transcribe_audio(
         self,
-        audio_file_path: str,
         session_id: str,
+        audio_file_path: Optional[str] = None,
+        audio_buffer: Optional[io.BytesIO] = None,
         language: str = "en",
     ) -> TranscriptionResult:
         """
-        Transcribe audio file using local Whisper model.
+        Transcribe audio using local Whisper model.
         
         Args:
-            audio_file_path: Path to audio file
             session_id: Curriculum session ID
+            audio_file_path: Optional path to audio file
+            audio_buffer: Optional BytesIO buffer containing audio data
             language: ISO 639-1 language code (default: "en")
         
         Returns:
             TranscriptionResult with full transcript + segments
-        
-        Raises:
-            FileNotFoundError: Audio file not found
-            RuntimeError: Transcription failed
         """
-        # Verify file exists
-        if not os.path.exists(audio_file_path):
-            raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
-        
-        # Get audio duration
-        duration = self._get_audio_duration(audio_file_path)
-        
-        # Convert to WAV (if needed)
-        wav_path = self._convert_to_wav(audio_file_path)
+        temp_file = None
         
         try:
-            # Read WAV file as binary
-            with open(wav_path, "rb") as f:
-                audio_bytes = f.read()
+            # If buffer provided, write to temp file first
+            if audio_buffer:
+                temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                audio_buffer.seek(0)
+                temp_file.write(audio_buffer.read())
+                temp_file.close()
+                audio_file_path = temp_file.name
+                logger.info(f"Using temp file for audio buffer: {audio_file_path}")
+
+            if not audio_file_path or not os.path.exists(audio_file_path):
+                raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
             
-            # Call Ollama Whisper API
-            import requests
-            start_time = datetime.now(timezone.utc)
+            # Get audio duration
+            duration = self._get_audio_duration(audio_file_path)
             
-            response = requests.post(
-                f"{self.ollama_base_url}/api/generate",
-                json={
-                    "model": self.model_name,
-                    "prompt": "",
-                    "images": [self._encode_audio_base64(audio_bytes)],
-                    "stream": False,
-                },
-                timeout=600,  # 10 min timeout for long transcriptions
-            )
+            # Convert to WAV (if needed)
+            wav_path = self._convert_to_wav(audio_file_path)
             
-            inference_time = (datetime.now(timezone.utc) - start_time).total_seconds()
-            
-            if response.status_code != 200:
-                raise RuntimeError(f"Ollama error: {response.text}")
-            
-            # Parse response
-            result = response.json()
-            transcript_text = result.get("response", "").strip()
-            
-            # Extract segments (Whisper can return timing info)
-            segments = self._parse_segments(transcript_text)
-            
-            # Create result
-            result_obj = TranscriptionResult(
-                session_id=session_id,
-                audio_file_path=audio_file_path,
-                transcript=transcript_text,
-                segments=segments,
-                language=language,
-                duration_seconds=duration,
-                model=self.model_name,
-                inference_time_seconds=inference_time,
-            )
-            
-            logger.info(
-                f"Transcription complete: {len(transcript_text)} chars, {inference_time:.1f}s",
-                extra={"session_id": session_id}
-            )
-            
-            return result_obj
-        
+            try:
+                # Read WAV file as binary
+                with open(wav_path, "rb") as f:
+                    audio_bytes = f.read()
+                
+                # Call Ollama Whisper API
+                import requests
+                start_time = datetime.now(timezone.utc)
+                
+                response = requests.post(
+                    f"{self.ollama_base_url}/api/generate",
+                    json={
+                        "model": self.model_name,
+                        "prompt": "",
+                        "images": [self._encode_audio_base64(audio_bytes)],
+                        "stream": False,
+                    },
+                    timeout=600,
+                )
+                
+                inference_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+                
+                if response.status_code != 200:
+                    raise RuntimeError(f"Ollama error: {response.text}")
+                
+                # Parse response
+                result = response.json()
+                transcript_text = result.get("response", "").strip()
+                
+                # Extract segments
+                segments = self._parse_segments(transcript_text)
+                
+                return TranscriptionResult(
+                    session_id=session_id,
+                    audio_file_path=audio_file_path,
+                    transcript=transcript_text,
+                    segments=segments,
+                    language=language,
+                    duration_seconds=duration,
+                    model=self.model_name,
+                    inference_time_seconds=inference_time,
+                )
+            finally:
+                # Clean up temp WAV if we created one during conversion
+                if wav_path != audio_file_path and os.path.exists(wav_path):
+                    try: os.remove(wav_path)
+                    except: pass
         finally:
-            # Clean up temp WAV file
-            if wav_path != audio_file_path and os.path.exists(wav_path):
-                try:
-                    os.remove(wav_path)
-                except:
-                    pass
+            # Clean up temp file if we created one from buffer
+            if temp_file and os.path.exists(temp_file.name):
+                try: os.remove(temp_file.name)
+                except: pass
+        
     
     @staticmethod
     def _encode_audio_base64(audio_bytes: bytes) -> str:
