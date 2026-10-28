@@ -4,6 +4,8 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Overridden to '/ScholarLab/' for GitHub Pages builds; '/' for dev, Docker and nginx.
+  base: process.env.VITE_BASE || '/',
   plugins: [react()],
   resolve: {
     alias: {

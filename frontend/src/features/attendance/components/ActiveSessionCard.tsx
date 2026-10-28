@@ -82,7 +82,6 @@ export const ActiveSessionCard: React.FC<ActiveSessionProps> = ({
           isOpen={showAttendanceFlow}
           sessionId={session.lecture.id}
           geofenceId={`geo_${session.lecture.classCode}`}
-          userEmail={user.email}
           onClose={() => setShowAttendanceFlow(false)}
           onSuccess={(data) => {
             onAttendanceMarked(data);

@@ -3,6 +3,7 @@ import { Upload, FileAudio, ShieldCheck, Loader2, CheckCircle2, AlertCircle, Tra
 import { apiClient } from '@/lib/api';
 import { Button } from '@/shared/ui/Button';
 import { toast } from 'sonner';
+import type { AxiosProgressEvent } from 'axios';
 import type { CurriculumAudioResponse } from '@/types/faculty';
 
 interface LectureAudioUploadProps {
@@ -49,7 +50,7 @@ export const LectureAudioUpload: React.FC<LectureAudioUploadProps> = ({
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
+          onUploadProgress: (progressEvent: AxiosProgressEvent) => {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total ?? 1));
             setUploadProgress(percentCompleted);
           },

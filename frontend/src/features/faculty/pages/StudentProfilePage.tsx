@@ -297,7 +297,7 @@ export const StudentProfilePage: React.FC = () => {
                 </p>
                 <div className="rounded-2xl bg-slate-50 p-6 border border-slate-100">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rolling Risk ($r_{i,t}$)</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rolling Risk (r<sub>i,t</sub>)</span>
                     <span className={`text-2xl font-bold ${risk && risk.risk_probability > 0.5 ? 'text-red-600' : 'text-emerald-600'}`}>
                       {((risk?.risk_probability ?? 0) * 100).toFixed(1)}%
                     </span>

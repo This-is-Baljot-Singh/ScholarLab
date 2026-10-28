@@ -401,7 +401,6 @@ export const StudentManagementTable: React.FC<StudentManagementTableProps> = ({
           isOpen={showRiskModal}
           studentId={selectedStudent.id}
           studentName={selectedStudent.name}
-          riskScore={selectedStudent.riskScore}
           onClose={() => {
             setShowRiskModal(false);
             setSelectedStudent(null);

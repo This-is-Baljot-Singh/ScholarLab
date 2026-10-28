@@ -7,4 +7,5 @@ export { ActiveSessionsPage } from './ActiveSessionsPage';
 export { VerificationQueuePage } from './VerificationQueuePage';
 export { PredictiveAnalyticsPage } from './PredictiveAnalyticsPage';
 export { StudentProfilePage } from './StudentProfilePage';
+export { AnalyticsDashboardPage } from './AnalyticsDashboardPage';
 export { FacultyLayout } from '../layouts/FacultyLayout';

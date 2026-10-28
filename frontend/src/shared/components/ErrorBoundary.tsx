@@ -2,7 +2,7 @@
  * Error boundaries and error handling utilities for the student dashboard
  */
 
-import React, { Component, ReactNode } from 'react';
+import React, { Component, type ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 

@@ -138,7 +138,7 @@ class ApiClient {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     authStore.logout();
-    window.location.href = '/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
   }
 
   public getInstance(): AxiosInstance {
